@@ -79,55 +79,53 @@ class Node(NodeOperations):
     def update_subscription(self, subscription):
         if not self.get_message(subscription['message_id']):
             raise Exception("Message to subscribe, %s does not exist at peer %s" % (subscription['message_id'], self.node_id))
-        if subscription['remote_is_subscribed'] is None:
-            Tables.Subscription.delete(
+        Tables.Subscription.create_or_update(
+            self.conn,
+            Utils.subclass_dict(subscription,
+                                {'node_id': self.node_id}))
+
+    def delete_subscription(self, subscription):
+        Tables.Subscription.delete(
+            self.conn,
+            self.node_id,
+            subscription['peer_id'],
+            subscription['message_id'])
+        other_subscription = Tables.Subscription.select_objs(self.conn, self.node_id, message_id=subscription['message_id'])
+        if other_subscription is None:
+            Tables.Message.delete(
                 self.conn,
                 self.node_id,
-                subscription['peer_id'],
                 subscription['message_id'])
-        else:
-            Tables.Subscription.create_or_update(
-                self.conn,
-                Utils.subclass_dict(subscription,
-                                    {'node_id': self.node_id}))
 
     # Returns (subscription, message)
     def get_subscription_update(self, peer_id):
         update = Tables.SubscriptionUpdates.select_obj(self.conn, self.node_id, peer_id)
 
         if not update:
-            return None, None
+            return None, None, None
 
-        Tables.Subscription.create_or_update(
-            self.conn,
-            {'node_id': self.node_id,
-             'peer_id': peer_id,
-             'message_id': update['message_id'],
-             'local_is_subscribed': update['is_subscribed'],
-             'local_center_distance': update['center_distance']})
+        if not update['delete_subscription'] is None:
+            self.update_subscription(
+                {'node_id': self.node_id,
+                 'peer_id': peer_id,
+                 'message_id': update['message_id'],
+                 'local_is_subscribed': update['is_subscribed'],
+                 'local_center_distance': update['center_distance']})
         
-        subscription = Tables.Subscription.select_obj(self.conn, self.node_id, peer_id, update['message_id'])
+        local_subscription = Tables.Subscription.select_obj(self.conn, self.node_id, peer_id, update['message_id'])
+        message = None
+        if update['send_message']:
+            message = Tables.Message.select_obj(self.conn, self.node_id, update['message_id'])
+
+        subscription = dict(local_subscription)
         subscription['peer_id'], subscription['node_id'] = subscription['node_id'], subscription['peer_id']
         subscription['remote_is_subscribed'], subscription['local_is_subscribed'] = subscription['local_is_subscribed'], subscription['remote_is_subscribed']
         subscription['remote_center_distance'], subscription['local_center_distance'] = subscription['local_center_distance'], subscription['remote_center_distance']
 
-        if update['is_subscribed'] is None:
-            Tables.Subscription.delete(
-                self.conn,
-                self.node_id,
-                peer_id,
-                update['message_id'])
-            subscription = Tables.Subscription.select_objs(self.conn, self.node_id, message_id=update['message_id'])
-            if subscription is None:
-                Tables.Message.delete(
-                    self.conn,
-                    self.node_id,
-                    update['message_id'])
+        if update['delete_subscription'] is None:
+            self.delete_subscription(local_subscription)
 
-        message = None
-        if update['send_message']:
-            message = Tables.Message.select_obj(self.conn, self.node_id, update['message_id'])
-        return subscription, message
+        return subscription, message, update['delete_subscription']
 
     def commit(self):
         self.conn.commit()

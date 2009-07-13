@@ -1,4 +1,6 @@
 drop view if exists subscription_updates cascade;
+drop view if exists subscription_deletes cascade;
+drop view if exists subscription_changes cascade;
 drop view if exists full_recursive_subscription cascade;
 drop view if exists recursive_subscription cascade;
 drop view if exists local_subscription cascade;
@@ -37,11 +39,12 @@ create view local_subscription as
   subscription as upstream
 
   join peer as upstream_peer on
-       upstream.local_center_distance is not NULL
        upstream.node_id = upstream_peer.node_id 
    and upstream.peer_id = upstream_peer.peer_id
+   and upstream.local_is_subscribed is not null -- if the subscription is deleted
+   and upstream.remote_is_subscribed is not null
    and (   upstream.local_center_distance > upstream.remote_center_distance
-        or upstream.local_center_distance is null
+        or upstream.local_center_distance is null -- if the subscription is new
         or upstream.remote_center_distance is null)
 
   join subscription as downstream on
@@ -116,7 +119,7 @@ create view full_recursive_subscription as
    union select * from subscription) as s;
 
 -- Difference between what other peers know of our subscription and our current subscription
-create view subscription_updates as
+create view subscription_changes as
  select
   full_recursive_local_subscription.node_id as node_id,
   full_recursive_local_subscription.message_id as message_id,
@@ -137,28 +140,45 @@ create view subscription_updates as
         or full_recursive_local_subscription.is_subscribed is null
         or full_recursive_subscription.local_is_subscribed is null
         or full_recursive_local_subscription.center_distance is null
-        or full_recursive_subscription.local_center_distance is null)
- -- Subscription to mark for removal
- union
- (select
+        or full_recursive_subscription.local_center_distance is null);
+
+-- Subscription to mark for removal
+create view subscription_deletes as
+ select
+  subscription.node_id as node_id,
+  subscription.message_id as message_id,
+  subscription.peer_id as peer_id
+ from
+  subscription
+ except
+  select
    subscription.node_id as node_id,
    subscription.message_id as message_id,
-   subscription.peer_id as peer_id,
-   null::integer as is_subscribed,
-   null::integer as center_distance,
-   false::bool as send_message
+   subscription.peer_id as peer_id
   from
    subscription
-  except
-   select
-    subscription.node_id as node_id,
-    subscription.message_id as message_id,
-    subscription.peer_id as peer_id,
-    null::integer as is_subscribed,
-    null::integer as center_distance,
-    false::bool as send_message
-   from
-    subscription
-    join full_recursive_local_subscription on
-	 subscription.node_id = full_recursive_local_subscription.node_id
-     and subscription.message_id = full_recursive_local_subscription.message_id);
+   join full_recursive_local_subscription on
+	subscription.node_id = full_recursive_local_subscription.node_id
+    and subscription.message_id = full_recursive_local_subscription.message_id;
+
+-- Maybe some randomization of order here?
+create view subscription_updates as
+  select
+   node_id as node_id,
+   message_id as message_id,
+   peer_id as peer_id,
+   is_subscribed as is_subscribed,
+   center_distance as center_distance,
+   send_message as send_message,
+   false as delete_subscription
+  from subscription_changes
+ union
+  select
+   node_id as node_id,
+   message_id as message_id,
+   peer_id as peer_id,
+   null::integer as is_subscribed,
+   null::integer as center_distance,
+   false as send_message,
+   true as delete_subscription
+  from subscription_deletes;

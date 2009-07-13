@@ -15,15 +15,18 @@ class SyncNode(Node.Node):
         if not send:
             self, other = other, self
 
-        subscription, message = self.get_subscription_update(other.node_id)
-        print self.node_id, "->", self.node_id, ":", subscription, message
+        subscription, message, delete_subscription = self.get_subscription_update(other.node_id)
+        print "%s -> %s : %s, %s, delete:%s" % (self.node_id, other.node_id, subscription, message, delete_subscription)
         if subscription:
-            # Yes, ignore result if syncing self, just pretend we did an update
-            if self.node_id != other.node_id:
-                if message:
-                    other.register_message(message, subscription)
-                else:
-                    other.update_subscription(subscription)
+            if delete_subscription:
+                other.delete_subscription(subscription)
+            else:
+                # Yes, ignore result if syncing self, just pretend we did an update
+                if self.node_id != other.node_id:
+                    if message:
+                        other.register_message(message, subscription)
+                    else:
+                        other.update_subscription(subscription)
             return 1
         return 0
 
@@ -114,6 +117,11 @@ class UINode(Node.Node):
                             'local_is_subscribed': 1}
         subscription['remote_is_subscribed'] = subscribed
         self.update_subscription(subscription)
+
+    def delete_local_subscription(self, message):
+        subscription = Tables.Subscription.select_obj(self.conn, node_id = self.node_id, peer_id = self.node_id, message_id = message['message_id'])
+        if subscription is not None:
+            self.delete_subscription(subscription)
 
     def post_text_message(self, content):
         return self.post_message({'content': content})

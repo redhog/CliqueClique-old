@@ -205,7 +205,7 @@ class MainWindow(object):
                     for message in messages:
                         node_id, message_id = message.split(':')
                         node = host.get_node(node_id, True)
-                        node.update_local_subscription(node.get_message(message_id), subscribed = None)
+                        node.delete_local_subscription(node.get_message(message_id))
                         node.commit()
                     (self + "2:Graph").update()
 
