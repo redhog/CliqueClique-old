@@ -1,12 +1,20 @@
 from __future__ import with_statement
 
-import datetime, md5, threading
+import datetime, md5, threading, operator
 import Utils, Tables, Node
 
 
 class SyncNode(Node.Node):
+    # Sync peers locally (where both are LocalNode:s). Note that we
+    # introduce disorder in the syncing order to crack loops.
+    # However we're lazy and don't use real randomness, which we should...
+    _sync_peers_locally_offset = 0
     def sync_peers_locally(self, other):
-        return self.sync_self() + other.sync_self() + self.sync_peers(other)
+        fns = [self.sync_self, other.sync_self, lambda: self.sync_peer(other, True), lambda: self.sync_peer(other, False)]
+        off = self._sync_peers_locally_offset
+        fns = fns[off:] + fns[:off]
+        self._sync_peers_locally_offset = (off + 1) % 4
+        return reduce(operator.add, (x() for x in fns))
 
     def sync_peers(self, other):
         return self.sync_peer(other, True) + self.sync_peer(other, False)
