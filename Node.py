@@ -122,7 +122,7 @@ class Node(NodeOperations):
         subscription['remote_is_subscribed'], subscription['local_is_subscribed'] = subscription['local_is_subscribed'], subscription['remote_is_subscribed']
         subscription['remote_center_distance'], subscription['local_center_distance'] = subscription['local_center_distance'], subscription['remote_center_distance']
 
-        if update['delete_subscription'] is None:
+        if update['delete_subscription']:
             self.delete_subscription(local_subscription)
 
         return subscription, message, update['delete_subscription']

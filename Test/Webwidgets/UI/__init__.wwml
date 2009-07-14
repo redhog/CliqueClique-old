@@ -28,6 +28,16 @@
   id="MainWindow"
   title="CliqueClique test app">
 
+  <w:Html id="Head">
+   <style>
+    table, table th, table td {
+     border: 1px solid black;
+     text-align: left;
+     border-collapse: collapse;
+    }
+   </style>
+  </w:Html>
+
   <w:Html id="Body">
    <w:DotGraph id="Graph" />
 

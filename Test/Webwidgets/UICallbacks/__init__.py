@@ -247,24 +247,27 @@ class MainWindow(object):
   <th>is_subscribed</th>
   <th>center_distance</th>
   <th>send_message</th>
+  <th>delete_subscription</th>
  </tr>
  %s
 </table>
                         """ % ('\n'.join(
 """
 <tr>
- <th colspan='6'>
+ <th colspan='3'>
   %s
  </th>
+ <th colspan='4'></th>
 </tr>
 %s
 """ % (node_id, '\n'.join(
 """
 <tr>
  <th></th>
- <th colspan='5'>
+ <th colspan='2'>
   %s
  </th>
+ <th colspan='4'></th>
 </tr>
 %s
 """ % (peer_id, '\n'.join(
@@ -276,6 +279,7 @@ class MainWindow(object):
  <td>%(is_subscribed)s</td>
  <td>%(center_distance)s</td>
  <td>%(send_message)s</td>
+ <td>%(delete_subscription)s</td>
 """ % subscription_data
                         for subscription_data in peer_data))
                         for (peer_id, peer_data) in node_data.iteritems()))
