@@ -3,6 +3,7 @@ from __future__ import with_statement
 import datetime, md5, threading, operator
 import Utils, Tables, Node
 
+debug_sync = True
 
 class SyncNode(Node.Node):
     # Sync peers locally (where both are LocalNode:s). Note that we
@@ -24,7 +25,8 @@ class SyncNode(Node.Node):
             self, other = other, self
 
         subscription, message, delete_subscription = self.get_subscription_update(other.node_id)
-        print "%s -> %s : %s, %s, delete:%s" % (self.node_id, other.node_id, subscription, message, delete_subscription)
+        if debug_sync:
+            print "Sync: %s -> %s : %s, %s, delete:%s" % (self.node_id, other.node_id, subscription, message, delete_subscription)
         if subscription:
             if delete_subscription:
                 other.delete_subscription(subscription)

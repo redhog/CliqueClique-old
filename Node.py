@@ -2,6 +2,9 @@ from __future__ import with_statement
 
 import Utils, Tables, datetime, md5, os.path
 
+debug_delete_subscription = True
+debug_delete_message = True
+
 class NodeOperations(object):
     @classmethod
     def _calculate_message_id(cls, salt, message):
@@ -85,13 +88,17 @@ class Node(NodeOperations):
                                 {'node_id': self.node_id}))
 
     def delete_subscription(self, subscription):
+        if debug_delete_subscription:
+            print "Delete subscription: node=%s peer=%s message=%s" % (self.node_id, subscription['peer_id'], subscription['message_id'])
         Tables.Subscription.delete(
             self.conn,
             self.node_id,
             subscription['peer_id'],
             subscription['message_id'])
-        other_subscription = Tables.Subscription.select_objs(self.conn, self.node_id, message_id=subscription['message_id'])
+        other_subscription = Tables.Subscription.select_obj(self.conn, self.node_id, message_id=subscription['message_id'])
         if other_subscription is None:
+            if debug_delete_message:
+                print "Delete message: node=%s message=%s" % (self.node_id, subscription['message_id'])
             Tables.Message.delete(
                 self.conn,
                 self.node_id,
