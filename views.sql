@@ -9,20 +9,24 @@ drop view if exists message_link cascade;
 
 create view message_link as
   select
-   node_id as node_id,
-   src_message_id as src_message_id,
-   message_id as dst_message_id
+   link_message.node_id as node_id,
+   link_message.src_message_id as src_message_id,
+   link_message.message_id as dst_message_id
   from
-   message
-  where src_message_id is not null
+   message as link_message,
+   message as src_message
+  where     link_message.src_message_id = src_message.message_id
+        and link_message.node_id = src_message.node_id
  union
   select
-   node_id as node_id,
-   message_id as src_message_id,
-   dst_message_id as dst_message_id
+   link_message.node_id as node_id,
+   link_message.message_id as src_message_id,
+   link_message.dst_message_id as dst_message_id
   from
-   message
-  where dst_message_id is not null;
+   message as link_message,
+   message as dst_message
+  where     link_message.dst_message_id = dst_message.message_id
+        and link_message.node_id = dst_message.node_id;
 
 create view local_subscription as
  select
