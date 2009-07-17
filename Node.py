@@ -2,16 +2,23 @@ from __future__ import with_statement
 
 import Utils, Tables, datetime, md5, os.path
 
-debug_delete_subscription = True
-debug_delete_message = True
+debug_delete_subscription = False
+debug_delete_message = False
+debug_message_id = True
 
 class NodeOperations(object):
     @classmethod
     def _calculate_message_id(cls, salt, message):
-        return md5.md5(salt + repr((message.get('content', None),
+        data = salt + repr((message.get('content', None),
                                     message.get('src_message_id', None),
                                     message.get('dst_message_id', None)))
-                       ).hexdigest()
+        message_id = md5.md5(data).hexdigest()
+        if debug_message_id:
+            print "Calculate message id:"
+            print data
+            print message_id
+            print
+        return message_id
 
     @classmethod
     def calculate_message_id(cls, message):

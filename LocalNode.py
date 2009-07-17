@@ -3,7 +3,7 @@ from __future__ import with_statement
 import datetime, md5, threading, operator
 import Utils, Tables, Node
 
-debug_sync = True
+debug_sync = False
 
 class SyncNode(Node.Node):
     # Sync peers locally (where both are LocalNode:s). Note that we
