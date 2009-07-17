@@ -28,6 +28,14 @@ import CliqueClique.Host, CliqueClique.Visualizer, CliqueClique.Tables
 def node_num_to_id(node_num):
     return md5.md5("node_%s" % node_num).hexdigest()
 
+def get_node_message(host, message):
+    node_id, message_id = message.split(':')
+    node = host.get_node(node_id, True)
+    return node, node.get_message(message_id)
+
+def get_message(host, message):
+    return get_node_message(host, message)[1]
+    
 class MainWindow(object):
     class Body(object):
         def __init__(self, *arg, **kw):
@@ -152,7 +160,16 @@ class MainWindow(object):
                     (self + "2:Graph").update()
 
             class Initialize(object):
-                pass
+                def clicked(self, path):
+                    host = (self + "2:").host
+                    host.initialize()
+                    poster_node = host.get_node(node_num_to_id(0), True)
+                    msg = poster_node.post_text_message('Root message')
+                    other_node = host.get_node(node_num_to_id(1), True)
+                    other_node.import_message_from_peer(poster_node, msg['message_id'])
+                    poster_node.commit()
+                    other_node.commit()
+                    (self + "2:Graph").update()
 
             class CreateTestData(object):
                 def clicked(self, path):
@@ -170,20 +187,33 @@ class MainWindow(object):
 
             class PostMessage(object):
                 def clicked(self, path):
-                    pass
+                    host = (self + "2:").host
+                    nodes = (self + "2:Params-Nodes-Field").value.strip().split(' ')
+                    node = host.get_node(nodes[0], True)
+                    text = (self + "2:Params-Text-Field").value.encode('utf-8')
+                    msg = node.post_text_message(text)
+                    node.commit()
+                    (self + "2:Graph").update()
 
             class PostLink(object):
                 def clicked(self, path):
-                    pass
+                    host = (self + "2:").host
+                    nodes = (self + "2:Params-Nodes-Field").value.strip().split(' ')
+                    node = host.get_node(nodes[0], True)
+                    text = (self + "2:Params-Text-Field").value.encode('utf-8')
+                    messages = [get_message(host, message_id)
+                                for message_id in (self + "2:Params-Messages-Field").value.strip().split(' ')]
+                    msg = node.post_link_message(text, *messages)
+                    node.commit()
+                    (self + "2:Graph").update()
 
             class Subscribe(object):
                 def clicked(self, path):
                     host = (self + "2:").host
                     messages = (self + "2:Params-Messages-Field").value.strip().split(' ')
                     for message in messages:
-                        node_id, message_id = message.split(':')
-                        node = host.get_node(node_id, True)
-                        node.update_local_subscription(node.get_message(message_id), subscribed = 1)
+                        node, message = get_node_message(host, message)
+                        node.update_local_subscription(message, subscribed = 1)
                         node.commit()
                     (self + "2:Graph").update()
 
@@ -192,9 +222,8 @@ class MainWindow(object):
                     host = (self + "2:").host
                     messages = (self + "2:Params-Messages-Field").value.strip().split(' ')
                     for message in messages:
-                        node_id, message_id = message.split(':')
-                        node = host.get_node(node_id, True)
-                        node.update_local_subscription(node.get_message(message_id), subscribed = 0)
+                        node, message = get_node_message(host, message)
+                        node.update_local_subscription(message, subscribed = 0)
                         node.commit()
                     (self + "2:Graph").update()
 
@@ -203,9 +232,8 @@ class MainWindow(object):
                     host = (self + "2:").host
                     messages = (self + "2:Params-Messages-Field").value.strip().split(' ')
                     for message in messages:
-                        node_id, message_id = message.split(':')
-                        node = host.get_node(node_id, True)
-                        node.delete_local_subscription(node.get_message(message_id))
+                        node, message = get_node_message(host, message)
+                        node.delete_local_subscription(message)
                         node.commit()
                     (self + "2:Graph").update()
 
