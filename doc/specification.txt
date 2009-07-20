@@ -1,0 +1,123 @@
+# -*- mode: org; coding: utf-8 -*-
+
+Very preliminary documentation of the workings of CliqueClique. These
+are based on notes taken from a discussion with redhog. May very well
+be wrong because of misunderstandings.
+
+
+* Peers (message propagators/storages and maybe even authors)
+
+Peers can store [[messages]] and [[subscriptions]].
+
+Access to these by some kind of application software is out of the
+scope of this document.
+
+* Messages (the bread, and maybe butter, of the system)
+
+Messages have a [[message type]], content and [[links]].
+
+The same message can (and often will) exist on more than one peer.
+
+Parts of the message information are considered metadata, and may vary
+over time, and between nodes.
+
+** Message types
+
+Message types are simply strings helping identify how they are to be
+interpreted.
+
+The system will have a list of standard message types every peer is
+expected to understand.
+
+Peers are allowed to understand nonstandard messages too.
+
+A preliminary list of standard types is:
+ - XML
+ - HTML
+ - SVG
+ - PNG
+ - XSLT
+
+Also there is a type called the external type.
+
+See [[extensible message content interpretation]] for more information.
+
+** Links (are messages too)
+
+Links are considered metadata, and may be added to already existing
+messages.
+
+Links are messages too, and also have types.
+
+The links may have a special "type" type. Indicating that it links to
+a message containing information for interpreting the message it links
+from. The corresponding message will then have its type set to
+the external type.
+
+** Extensible message content interpretation
+
+A type link may point to a message of the XSLT type, that contains
+information for transforming the original message into a document of
+one of the understood types.
+
+This system is further extensible. Type-interpretaion-messages may in
+turn have links to type-interpretaion-messages, implementing a
+multiple stage message content transform. This allows serious
+distributed, extensible message-interpretation goodness.
+
+* Subscriptions (make the world go round)
+
+Subscriptions describe how a message is propagated from one peer to
+another.
+
+One subscription may exist per message on each peer.
+
+A subscription may exist for a message that is not yet (or ever)
+stored on the peer.
+
+Subscriptions exists on both peers when one peer subscribes to a
+message on the other. Both nodes will then have the same message
+(assuming they have the ability to synchronize over the network).
+
+The subscriptions also acts as the storage place for the meta-data of
+their messages.
+
+** The message propagation
+
+The subscription may concern messages linked to it's primary message.
+
+The subscription contains two flags, local-is-subscribed and
+remote-is-subscribed. These indicate if the peer or its counterpart
+wants copies of messages linked to the subscribed message.
+
+This makes the subscription model powerful.
+
+** Desired properties of the subscription graph
+
+The peers form nodes and the subscriptions form edges in a
+subscription graph. (The subscription graphs are separate for each
+message).
+
+More specifically the graphs are directed, acyclic and connected.
+
+ *The subscription graph needs to be connected.*
+
+Messages have an implicit origin peer, from which others peers
+subscribe, and from which other peers may subscribe in turn. (In this
+role, referring to peers as "peers" might be a bit misleading. Though
+it's motivated by the fact that they can have the opposite role for
+other subscriptions)
+
+If the graph is disconnected, propagation of new messages from the
+origin won't work. This is highly undesirable.
+
+** Center distance
+
+Center distance indicates the number of subscription hops a message
+has taken from its origin peer.
+
+This distance may change over time as the subscription graph changes.
+
+A subscription keeps track of this value for itself and for its peer,
+to allow propagating changes of the center distance to the
+subscription on the other peer.
