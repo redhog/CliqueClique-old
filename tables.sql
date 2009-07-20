@@ -31,9 +31,11 @@ create table subscription (
 
  local_is_subscribed integer, -- not bool, to be able to do max(); 1 is true, 0 false, null is deleted
  local_center_distance integer,
+-- local_center_nodde char (32),
 
  remote_is_subscribed integer, -- not bool, to be able to do max(); 1 is true, 0 false, null is deleted
  remote_center_distance integer,
+-- remote_center_node char (32),
 
  foreign key (node_id, message_id) references message(node_id, message_id),
  foreign key (node_id, peer_id) references peer(node_id, peer_id)
