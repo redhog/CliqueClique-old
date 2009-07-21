@@ -1,9 +1,13 @@
 # -*- mode: org; coding: utf-8 -*-
 
-Very preliminary documentation of the workings of CliqueClique. These
-are based on notes taken from a discussion with redhog. May very well
-be wrong because of misunderstandings.
+#+TITLE: Some kind of CliqueClique specification
+#+AUTHOR: Nicklas Lindgren
+#+EMAIL: nili@gulmohar.se
+#+LANGUAGE: en
 
+#+TEXT: Very preliminary documentation of the workings of CliqueClique. These
+#+TEXT: are based on notes taken from a discussion with redhog. May very well
+#+TEXT: be wrong because of misunderstandings.
 
 * Peers (message propagators/storages and maybe even authors)
 
