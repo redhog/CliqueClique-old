@@ -31,10 +31,10 @@ class NodeOperations(object):
 
     @classmethod
     def calculate_message_id(cls, message):
-        return cls._calculate_data_id(
-            repr((message.get('content', None),
-                  message.get('src_message_id', None),
-                  message.get('dst_message_id', None))))
+        return cls._calculate_data_id("%s:%s:%s" % (
+            message.get('content', ''),
+            cls.id2s(message.get('src_message_id', None)),
+            cls.id2s(message.get('dst_message_id', None))))
     
     @classmethod
     def calculate_message_challenge(cls, message):
@@ -93,8 +93,8 @@ class Node(NodeOperations):
     def register_message(self, message, subscription):
         if message['message_id'] != subscription['message_id']:
             raise Exception("Subscription must be for message being registered")
-        if (   message['message_id'] != self.calculate_message_id(message)
-            or message['message_challenge'] != self.calculate_message_challenge(message)):
+        if (   int(message['message_id']) != self.calculate_message_id(message)
+            or int(message['message_challenge']) != self.calculate_message_challenge(message)):
             raise Exception("Message id or challenge does not match message content (bad md5-sum!)")
         self._register_message(message)
         self.update_subscription(subscription)

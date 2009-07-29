@@ -269,10 +269,10 @@ class MainWindow(object):
 
                 res = {}
                 node_ids = (self + "1:Params-Nodes-Field").value.strip()
-                node_ids = node_ids and set(node_ids.split(' ')) or []
+                node_ids = node_ids and set(graph.s2id(node_id) for node_id in node_ids.split(' ')) or set()
 
                 for node_id in node_ids:
-                    node = graph.get_node(node_id)
+                    node = graph.get_node(graph.id2s(node_id))
                     res[node_id] = {}
                     for peer_id in node_ids:
                         res[node_id][peer_id] = CliqueClique.Tables.SubscriptionUpdates.select_objs(
