@@ -1,0 +1,16 @@
+* IDs and PostgreSQL
+
+PostgreSQL can compare multiple values in an aggregate function using
+arrays. E.g. "select col12[1], col12[2] from (select min(array[col1,
+col2]) as col12 from foo) as bar;" will select the row with the lowest
+col1 value, and among those rows, if there are more than one with the
+same value, the one with the lowest col2 value. However, this only
+works if all columns have compatible types, e.g. integer and numeric
+(not integer and varchar).
+
+As center_distance is integer, center_node needs to be that too (or a
+compatible type, like numeric).
+
+It might be a good idea generally to store IDs (node_id:s,
+message_id:s) as numeric, not hexadecimal varchar. What about
+transmission?

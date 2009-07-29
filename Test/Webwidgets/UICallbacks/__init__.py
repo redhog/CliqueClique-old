@@ -23,19 +23,11 @@ import pydot
 import Webwidgets
 import sqlite3
 import md5
-import CliqueClique.Host, CliqueClique.Visualizer, CliqueClique.Tables
+import CliqueClique.Host, CliqueClique.Node, CliqueClique.Visualizer, CliqueClique.Tables
 
 def node_num_to_id(node_num):
     return md5.md5("node_%s" % node_num).hexdigest()
 
-def get_node_message(host, message):
-    node_id, message_id = message.split(':')
-    node = host.get_node(node_id, True)
-    return node, node.get_message(message_id)
-
-def get_message(host, message):
-    return get_node_message(host, message)[1]
-    
 class MainWindow(object):
     class Body(object):
         def __init__(self, *arg, **kw):
@@ -46,20 +38,40 @@ class MainWindow(object):
             def __init__(self, *arg, **kw):
                 Webwidgets.DotGraph.__init__(self, *arg, **kw)
                 CliqueClique.Visualizer.Visualizer.__init__(self)
-                
+
+            def output(self, output_options):
+                try:
+                    return Webwidgets.DotGraph.output(self, output_options)
+                finally:
+                    print "=========================================="
+                    print self.graph.create(format = 'dot')
+                    print "=========================================="
+
+            def get_node(self, node_id):
+                return self.parent.host.get_node(self.s2id(node_id), True)
+
+            def get_node_message(self, message):
+                node_id, message_id = message.split(':')
+                node = self.get_node(node_id)
+                return node, node.get_message(self.s2id(message_id))
+
+            def get_message(self, message):
+                return self.get_node_message(message)[1]
+
+
             def update(self):
                 self.clear()
                 self.add_host(self.parent.host)
 
             def add_node(self, node, **kw):
-                if node.node_id in (self + "1:Params-Nodes-Field").value: 
+                if node.id2s(node.node_id) in (self + "1:Params-Nodes-Field").value: 
                     kw['style'] = 'filled'
                     kw['fillcolor'] = self.node_color
                 CliqueClique.Visualizer.Visualizer.add_node(
-                    self, node, URL = self.calculate_callback_url('node:%s' % (node.node_id,)), **kw)
+                    self, node, URL = self.calculate_callback_url('node:%s' % (node.id2s(node.node_id),)), **kw)
 
             def add_message(self, node, message, local_subscription, **kw):
-                id_name = '%s:%s' % (node.node_id,
+                id_name = '%s:%s' % (node.id2s(node.node_id),
                                      message['message_id'])
                 if id_name in (self + "1:Params-Messages-Field").value:
                     kw['style'] = 'filled'
@@ -75,9 +87,9 @@ class MainWindow(object):
                     **kw)
                 
             def add_subscription(self, node, subscription, **kw):
-                id_name = '%s:%s:%s' % (node.node_id,
-                                        subscription['message_id'],
-                                        subscription['peer_id'])
+                id_name = '%s:%s:%s' % (node.id2s(node.node_id),
+                                        node.id2s(subscription['message_id']),
+                                        node.id2s(subscription['peer_id']))
                 if id_name in (self + "1:Params-Subscriptions-Field").value: 
                     kw['labelfontcolor'] = self.remote_subscription_color
                 CliqueClique.Visualizer.Visualizer.add_subscription(
@@ -111,49 +123,49 @@ class MainWindow(object):
 
             class SyncSelf(object):
                 def clicked(self, path):
-                    host = (self + "2:").host
+                    graph = self + "2:Graph"
                     nodes = (self + "2:Params-Nodes-Field").value.strip().split(' ')
                     for node in nodes:
-                        node = host.get_node(node, True)
+                        node = graph.get_node(node)
                         node.sync_self()
                         node.commit()
                     (self + "2:Graph").update()
             class Sync(object):
                 def clicked(self, path):
-                    host = (self + "2:").host
+                    graph = self + "2:Graph"
                     nodes = (self + "2:Params-Nodes-Field").value.strip().split(' ')
-                    node1 = host.get_node(nodes[0], True)
-                    node2 = host.get_node(nodes[1], True)
+                    node1 = graph.get_node(nodes[0])
+                    node2 = graph.get_node(nodes[1])
                     node1.sync_peer(node2)
                     node1.commit()
                     node2.commit()
                     (self + "2:Graph").update()
             class RevSync(object):
                 def clicked(self, path):
-                    host = (self + "2:").host
+                    graph = self + "2:Graph"
                     nodes = (self + "2:Params-Nodes-Field").value.strip().split(' ')
-                    node1 = host.get_node(nodes[0], True)
-                    node2 = host.get_node(nodes[1], True)
+                    node1 = graph.get_node(nodes[0])
+                    node2 = graph.get_node(nodes[1])
                     node2.sync_peer(node1)
                     node1.commit()
                     node2.commit()
                     (self + "2:Graph").update()
             class SyncBoth(object):
                 def clicked(self, path):
-                    host = (self + "2:").host
+                    graph = self + "2:Graph"
                     nodes = (self + "2:Params-Nodes-Field").value.strip().split(' ')
-                    node1 = host.get_node(nodes[0], True)
-                    node2 = host.get_node(nodes[1], True)
+                    node1 = graph.get_node(nodes[0])
+                    node2 = graph.get_node(nodes[1])
                     node2.sync_peers(node1)
                     node1.commit()
                     node2.commit()
                     (self + "2:Graph").update()
             class SyncAll(object):
                 def clicked(self, path):
-                    host = (self + "2:").host
+                    graph = self + "2:Graph"
                     nodes = (self + "2:Params-Nodes-Field").value.strip().split(' ')
-                    node1 = host.get_node(nodes[0], True)
-                    node2 = host.get_node(nodes[1], True)
+                    node1 = graph.get_node(nodes[0])
+                    node2 = graph.get_node(nodes[1])
                     while node2.sync_peers_locally(node1): pass
                     node1.commit()
                     node2.commit()
@@ -161,11 +173,11 @@ class MainWindow(object):
 
             class Initialize(object):
                 def clicked(self, path):
-                    host = (self + "2:").host
-                    host.initialize()
-                    poster_node = host.get_node(node_num_to_id(0), True)
+                    graph = self + "2:Graph"
+                    (self+"2:").host.initialize()
+                    poster_node = graph.get_node(node_num_to_id(0))
                     msg = poster_node.post_text_message('Root message')
-                    other_node = host.get_node(node_num_to_id(1), True)
+                    other_node = graph.get_node(node_num_to_id(1))
                     other_node.import_message_from_peer(poster_node, msg['message_id'])
                     poster_node.commit()
                     other_node.commit()
@@ -173,13 +185,13 @@ class MainWindow(object):
 
             class CreateTestData(object):
                 def clicked(self, path):
-                    host = (self + "2:").host
-                    host.initialize()
-                    poster_node = host.get_node(node_num_to_id(0), True)
+                    graph = self + "2:Graph"
+                    (self+"2:").host.initialize()
+                    poster_node = graph.get_node(node_num_to_id(0))
                     msg1 = poster_node.post_text_message('Message')
                     msg2 = poster_node.post_text_message('Comment')
                     msglnk1 = poster_node.post_link_message('Link', msg1, msg2)
-                    other_node = host.get_node(node_num_to_id(1), True)
+                    other_node = graph.get_node(node_num_to_id(1))
                     other_node.import_message_from_peer(poster_node, msg1['message_id'])
                     poster_node.commit()
                     other_node.commit()
@@ -187,9 +199,9 @@ class MainWindow(object):
 
             class PostMessage(object):
                 def clicked(self, path):
-                    host = (self + "2:").host
+                    graph = self + "2:Graph"
                     nodes = (self + "2:Params-Nodes-Field").value.strip().split(' ')
-                    node = host.get_node(nodes[0], True)
+                    node = graph.get_node(nodes[0])
                     text = (self + "2:Params-Text-Field").value.encode('utf-8')
                     msg = node.post_text_message(text)
                     node.commit()
@@ -197,11 +209,11 @@ class MainWindow(object):
 
             class PostLink(object):
                 def clicked(self, path):
-                    host = (self + "2:").host
+                    graph = self + "2:Graph"
                     nodes = (self + "2:Params-Nodes-Field").value.strip().split(' ')
-                    node = host.get_node(nodes[0], True)
+                    node = graph.get_node(nodes[0])
                     text = (self + "2:Params-Text-Field").value.encode('utf-8')
-                    messages = [get_message(host, message_id)
+                    messages = [graph.get_message(message_id)
                                 for message_id in (self + "2:Params-Messages-Field").value.strip().split(' ')]
                     msg = node.post_link_message(text, *messages)
                     node.commit()
@@ -209,30 +221,30 @@ class MainWindow(object):
 
             class Subscribe(object):
                 def clicked(self, path):
-                    host = (self + "2:").host
+                    graph = self + "2:Graph"
                     messages = (self + "2:Params-Messages-Field").value.strip().split(' ')
                     for message in messages:
-                        node, message = get_node_message(host, message)
+                        node, message = graph.get_node_message(message)
                         node.update_local_subscription(message, subscribed = 1)
                         node.commit()
                     (self + "2:Graph").update()
 
             class Unsubscribe(object):
                 def clicked(self, path):
-                    host = (self + "2:").host
+                    graph = self + "2:Graph"
                     messages = (self + "2:Params-Messages-Field").value.strip().split(' ')
                     for message in messages:
-                        node, message = get_node_message(host, message)
+                        node, message = graph.get_node_message(message)
                         node.update_local_subscription(message, subscribed = 0)
                         node.commit()
                     (self + "2:Graph").update()
 
             class Erase(object):
                 def clicked(self, path):
-                    host = (self + "2:").host
+                    graph = self + "2:Graph"
                     messages = (self + "2:Params-Messages-Field").value.strip().split(' ')
                     for message in messages:
-                        node, message = get_node_message(host, message)
+                        node, message = graph.get_node_message(message)
                         node.delete_local_subscription(message)
                         node.commit()
                     (self + "2:Graph").update()
@@ -253,14 +265,14 @@ class MainWindow(object):
 
         class SubscriptionUpdates(object):
             def draw(self, output_options):
-                host = (self + "1:").host
+                graph = self + "1:Graph"
 
                 res = {}
                 node_ids = (self + "1:Params-Nodes-Field").value.strip()
                 node_ids = node_ids and set(node_ids.split(' ')) or []
 
                 for node_id in node_ids:
-                    node = host.get_node(node_id, True)
+                    node = graph.get_node(node_id)
                     res[node_id] = {}
                     for peer_id in node_ids:
                         res[node_id][peer_id] = CliqueClique.Tables.SubscriptionUpdates.select_objs(

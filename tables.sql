@@ -5,8 +5,8 @@ drop table if exists peer cascade;
 
 
 create table peer (
- node_id char (32),
- peer_id char (32),
+ node_id numeric,
+ peer_id numeric,
  last_seen_time timestamp,
  last_seen_address varchar,
  do_mirror integer, -- not bool, to be able to do max(); 1 is true, 0 false
@@ -14,37 +14,37 @@ create table peer (
 );
 
 create table message (
- node_id char (32),
- message_id char (32),
- message_challenge char (32), -- used to check if a peer has this message
- message_response char (32), -- reply from peer if it does have this message
+ node_id numeric,
+ message_id numeric,
+ message_challenge numeric, -- used to check if a peer has this message
+ message_response numeric, -- reply from peer if it does have this message
  content varchar,
- src_message_id char (32), -- references message(message_id), but can point to unexistent rows
- dst_message_id char (32),
+ src_message_id numeric, -- references message(message_id), but can point to unexistent rows
+ dst_message_id numeric,
  primary key (node_id, message_id)
 );
 
 create table subscription (
- node_id char (32),
- message_id char (32),
- peer_id char (32),
+ node_id numeric,
+ message_id numeric,
+ peer_id numeric,
 
  local_is_subscribed integer, -- not bool, to be able to do max(); 1 is true, 0 false, null is deleted
+ local_center_node numeric,
  local_center_distance integer,
--- local_center_nodde char (32),
 
  remote_is_subscribed integer, -- not bool, to be able to do max(); 1 is true, 0 false, null is deleted
+ remote_center_node numeric,
  remote_center_distance integer,
--- remote_center_node char (32),
 
  foreign key (node_id, message_id) references message(node_id, message_id),
  foreign key (node_id, peer_id) references peer(node_id, peer_id)
 );
 
 create table annotations (
- node_id char (32),
- message_id char (32), -- can be null to annotate the peer itself
- peer_id char (32),
+ node_id numeric,
+ message_id numeric, -- can be null to annotate the peer itself
+ peer_id numeric,
 
  name varchar,
  value varchar,

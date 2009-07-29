@@ -8,29 +8,42 @@ debug_message_id = True
 
 class NodeOperations(object):
     @classmethod
-    def _calculate_message_id(cls, salt, message):
-        data = salt + repr((message.get('content', None),
-                                    message.get('src_message_id', None),
-                                    message.get('dst_message_id', None)))
-        message_id = md5.md5(data).hexdigest()
+    def id2s(cls, data_id):
+        if data_id is None:
+            return ""
+        return hex(int(data_id))[2:-1]
+
+    @classmethod
+    def s2id(cls, data_id):
+        if data_id == "":
+            return None
+        return int(data_id, 16)
+
+    @classmethod
+    def _calculate_data_id(cls, data):
+        data_id = cls.s2id(md5.md5(data).hexdigest())
         if debug_message_id:
-            print "Calculate message id:"
+            print "Calculate data id:"
             print data
-            print message_id
+            print cls.id2s(data_id)
             print
-        return message_id
+        return data_id
 
     @classmethod
     def calculate_message_id(cls, message):
-        return cls._calculate_message_id('id', message)
-        
+        return cls._calculate_data_id(
+            repr((message.get('content', None),
+                  message.get('src_message_id', None),
+                  message.get('dst_message_id', None))))
+    
     @classmethod
     def calculate_message_challenge(cls, message):
-        return cls._calculate_message_id('challenge', message)
+        return cls._calculate_data_id("challenge/%s" % (cls.id2s(cls.calculate_message_id(message)),))
         
     @classmethod
     def calculate_message_response(cls, node_id, message):
-        return cls._calculate_message_id('response' + node_id, message)
+        return cls._calculate_data_id("challenge/%s/%s" % (cls.id2s(node_id),
+                                                           cls.id2s(cls.calculate_message_id(message))))
 
 class Node(NodeOperations):
     def __init__(self, conn, node_id, host):
@@ -124,6 +137,7 @@ class Node(NodeOperations):
                  'peer_id': peer_id,
                  'message_id': update['message_id'],
                  'local_is_subscribed': update['is_subscribed'],
+                 'local_center_node': update['center_node'],
                  'local_center_distance': update['center_distance']})
         
         local_subscription = Tables.Subscription.select_obj(self.conn, self.node_id, peer_id, update['message_id'])
@@ -134,6 +148,7 @@ class Node(NodeOperations):
         subscription = dict(local_subscription)
         subscription['peer_id'], subscription['node_id'] = subscription['node_id'], subscription['peer_id']
         subscription['remote_is_subscribed'], subscription['local_is_subscribed'] = subscription['local_is_subscribed'], subscription['remote_is_subscribed']
+        subscription['remote_center_node'], subscription['local_center_node'] = subscription['local_center_node'], subscription['remote_center_node']
         subscription['remote_center_distance'], subscription['local_center_distance'] = subscription['local_center_distance'], subscription['remote_center_distance']
 
         if update['delete_subscription']:

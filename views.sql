@@ -4,6 +4,8 @@ drop view if exists subscription_changes cascade;
 drop view if exists full_recursive_subscription cascade;
 drop view if exists recursive_subscription cascade;
 drop view if exists local_subscription cascade;
+drop view if exists downstream_subscription cascade;
+drop view if exists upstream_subscription cascade;
 drop view if exists message_link cascade;
 
 
@@ -28,45 +30,83 @@ create view message_link as
   where     link_message.dst_message_id = dst_message.message_id
         and link_message.node_id = dst_message.node_id;
 
+create view upstream_subscription as
+ select
+  node_id as node_id,
+  message_id as message_id,
+  peer_id as peer_id,
+
+  local_is_subscribed as local_is_subscribed,
+  local_center_node as local_center_node,
+  local_center_distance as local_center_distance,
+
+  remote_is_subscribed as remote_is_subscribed,
+  remote_center_node as remote_center_node,
+  remote_center_distance as remote_center_distance
+ from
+  subscription
+ where
+      local_is_subscribed is not null -- if the subscription is deleted
+  and remote_is_subscribed is not null
+  and (   local_center_node > remote_center_node
+       or local_center_distance > remote_center_distance
+       or local_center_distance is null -- if the subscription is new
+       or remote_center_distance is null);
+
+create view downstream_subscription as
+ select
+  subscription.node_id as node_id,
+  subscription.message_id as message_id,
+  subscription.peer_id as peer_id,
+
+  subscription.local_is_subscribed as local_is_subscribed,
+  subscription.local_center_node as local_center_node,
+  subscription.local_center_distance as local_center_distance,
+
+  subscription.remote_is_subscribed as remote_is_subscribed,
+  subscription.remote_center_node as remote_center_node,
+  subscription.remote_center_distance as remote_center_distance
+ from
+  subscription
+  join peer on
+       subscription.node_id = peer.node_id
+   and subscription.peer_id = peer.peer_id 
+ where
+     peer.do_mirror != 0
+  or subscription.local_center_node <= subscription.remote_center_node
+  or subscription.local_center_distance <= subscription.remote_center_distance
+  or subscription.local_center_distance is null
+  or subscription.remote_center_distance is null;
+
 create view local_subscription as
  select
-  upstream.node_id as node_id,
-  upstream.message_id as message_id,
-  coalesce(
-   max(
-    case when upstream.local_center_distance is null or upstream.remote_center_distance is null then 0
-    else downstream.remote_is_subscribed
-    end),
-   0) as is_subscribed,
-  min(upstream.remote_center_distance) + 1 as center_distance
+  node_id as node_id,
+  message_id as message_id,
+  is_subscribed as is_subscribed,
+  min_center[1] as center_node,
+  min_center[2] + 1 as center_distance
  from
-  subscription as upstream
+  (select
+    upstream.node_id as node_id,
+    upstream.message_id as message_id,
+    coalesce(
+     max(
+      case when upstream.local_center_distance is null or upstream.remote_center_distance is null then 0
+      else downstream.remote_is_subscribed
+      end),
+     0) as is_subscribed,
+    min(array[upstream.remote_center_node, upstream.remote_center_distance]) as min_center
+   from
+    upstream_subscription as upstream
 
-  join peer as upstream_peer on
-       upstream.node_id = upstream_peer.node_id 
-   and upstream.peer_id = upstream_peer.peer_id
-   and upstream.local_is_subscribed is not null -- if the subscription is deleted
-   and upstream.remote_is_subscribed is not null
-   and (   upstream.local_center_distance > upstream.remote_center_distance
-        or upstream.local_center_distance is null -- if the subscription is new
-        or upstream.remote_center_distance is null)
-
-  join subscription as downstream on
-       upstream.node_id = downstream.node_id
-
-  join peer as downstream_peer on
-       downstream.node_id = downstream_peer.node_id
-   and downstream.peer_id = downstream_peer.peer_id 
-   and (   downstream_peer.do_mirror != 0
-        or downstream.local_center_distance <= downstream.remote_center_distance
-        or downstream.local_center_distance is null
-        or downstream.remote_center_distance is null)
-   and upstream.message_id = downstream.message_id
- group by
-  upstream.node_id,
-  upstream.message_id
- having
-  count(downstream.message_id) > 0;
+    join downstream_subscription as downstream on
+	 upstream.node_id = downstream.node_id
+     and upstream.message_id = downstream.message_id
+   group by
+    upstream.node_id,
+    upstream.message_id
+   having
+    count(downstream.message_id) > 0) as multi_mini;
 
 create view recursive_local_subscription as
  select
@@ -74,6 +114,7 @@ create view recursive_local_subscription as
   message_link.dst_message_id as message_id,
  
   0 as is_subscribed,
+  null as center_node,
   null as center_distance
  from
   message_link
@@ -87,7 +128,8 @@ create view full_recursive_local_subscription as
   node_id,
   message_id,
   max(is_subscribed) as is_subscribed,
-  min(center_distance) as center_distance
+  min(center_distance) as center_distance,
+  min(center_node) as center_node -- could have done the min(array[]) thing here, but we're only ever gonna have two values, a value and null so it doesn't matter just here
  from
   (      select * from recursive_local_subscription
    union select * from local_subscription) as s
@@ -102,9 +144,11 @@ create view recursive_subscription as
   src_subscription.peer_id as peer_id,
 
   dst_subscription.local_is_subscribed as local_is_subscribed,
+  dst_subscription.local_center_node as local_center_node,
   dst_subscription.local_center_distance as local_center_distance,
 
   dst_subscription.remote_is_subscribed as remote_is_subscribed,
+  dst_subscription.remote_center_node as remote_center_node,
   dst_subscription.remote_center_distance as remote_center_distance
  from
   message_link
@@ -130,6 +174,7 @@ create view subscription_changes as
   full_recursive_subscription.peer_id as peer_id,
 
   full_recursive_local_subscription.is_subscribed as is_subscribed,
+  full_recursive_local_subscription.center_node as center_node,
   full_recursive_local_subscription.center_distance as center_distance,
 
   -- If we don't have an existing subscription on record for the peer, send the whole message too 
@@ -172,6 +217,7 @@ create view subscription_updates as
    message_id as message_id,
    peer_id as peer_id,
    is_subscribed as is_subscribed,
+   center_node as center_node,
    center_distance as center_distance,
    send_message as send_message,
    false as delete_subscription
@@ -182,6 +228,7 @@ create view subscription_updates as
    message_id as message_id,
    peer_id as peer_id,
    null::integer as is_subscribed,
+   null::numeric as center_node,
    null::integer as center_distance,
    false as send_message,
    true as delete_subscription

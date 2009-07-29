@@ -110,13 +110,7 @@ class UINode(Node.Node):
         message['message_id'] = self.calculate_message_id(message)
         message['message_challenge'] = self.calculate_message_challenge(message)
         self._register_message(message)
-        self.update_subscription({'peer_id': self.node_id,
-                                  'message_id': message['message_id'],
-                                  'local_is_subscribed': 1,
-                                  'local_center_distance': 1,
-
-                                  'remote_is_subscribed': 1,
-                                  'remote_center_distance': 0})
+        self.update_local_subscription(message)
         return message
 
     def update_local_subscription(self, message, subscribed = 1):
@@ -124,7 +118,12 @@ class UINode(Node.Node):
         if subscription is None:
             subscription = {'peer_id': self.node_id,
                             'message_id': message['message_id'],
-                            'local_is_subscribed': 1}
+                            'local_is_subscribed': 1,
+                            'local_center_node': self.node_id,
+                            'local_center_distance': 1,
+                            'remote_is_subscribed': 1,
+                            'remote_center_node': self.node_id,
+                            'remote_center_distance': 0}
         subscription['remote_is_subscribed'] = subscribed
         self.update_subscription(subscription)
 
