@@ -32,7 +32,7 @@ class Visualizer(CliqueClique.Node.NodeOperations):
 
     def add_node(self, node, **kw):
         node_id = node.node_id
-        self.clusters[self.id2s(node_id)] = pydot.Cluster('"%s"' % (self.id2s(node_id),), label='"%s"' % (self._id2label(node_id),), color = self.node_color, **kw)
+        self.clusters[self.id2s(node_id)] = pydot.Cluster(self.id2s(node_id), label='"%s"' % (self._id2label(node_id),), color = self.node_color, **kw)
         self.graph.add_subgraph(self.clusters[self.id2s(node_id)])
         for message in node._get_messages():
             local_subscription = list(node._get_local_subscriptions(message_id = message['message_id']))
