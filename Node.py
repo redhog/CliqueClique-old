@@ -4,7 +4,7 @@ import Utils, Tables, datetime, md5, os.path
 
 debug_delete_subscription = False
 debug_delete_message = False
-debug_message_id = True
+debug_message_id = False
 
 class NodeOperations(object):
     @classmethod

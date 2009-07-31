@@ -14,14 +14,18 @@ class Table(object):
 
     @classmethod
     def _select_dicts(cls, conn, *arg, **kw):
-        with contextlib.closing(conn.cursor()) as cur:
-            cur.execute(*arg, **kw)
-            row = cur.fetchone()
-            if row is not None:
-                cols = [dsc[0] for dsc in cur.description]
-                while row is not None:
-                    yield dict(zip(cols, row))
-                    row = cur.fetchone()
+        try:
+            with contextlib.closing(conn.cursor()) as cur:
+                cur.execute(*arg, **kw)
+                row = cur.fetchone()
+                if row is not None:
+                    cols = [dsc[0] for dsc in cur.description]
+                    while row is not None:
+                        yield dict(zip(cols, row))
+                        row = cur.fetchone()
+        except Exception, e:
+            e.args = e.args + (arg, kw)
+            raise
                 
     @classmethod
     def _select_dict(cls, conn, *arg, **kw):

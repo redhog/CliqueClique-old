@@ -28,6 +28,8 @@ import CliqueClique.Host, CliqueClique.Node, CliqueClique.Visualizer, CliqueCliq
 def node_num_to_id(node_num):
     return md5.md5("node_%s" % node_num).hexdigest()
 
+debug_graphviz = False
+
 class MainWindow(object):
     class Body(object):
         def __init__(self, *arg, **kw):
@@ -43,9 +45,10 @@ class MainWindow(object):
                 try:
                     return Webwidgets.DotGraph.output(self, output_options)
                 finally:
-                    print "=========================================="
-                    print self.graph.create(format = 'dot')
-                    print "=========================================="
+                    if debug_graphviz:
+                        print "=========================================="
+                        print self.graph.create(format = 'dot')
+                        print "=========================================="
 
             def get_node(self, node_id):
                 return self.parent.host.get_node(self.s2id(node_id), True)
@@ -171,6 +174,24 @@ class MainWindow(object):
                     node2.commit()
                     (self + "2:Graph").update()
 
+            class StartThreadSync(object):
+                def clicked(self, path):
+                    graph = self + "2:Graph"
+                    nodes = (self + "2:Params-Nodes-Field").value.strip().split(' ')
+                    for node in nodes:
+                        node = graph.get_node(node)
+                        node.sync_start()
+                    (self + "2:Graph").update()
+
+            class StopThreadSync(object):
+                def clicked(self, path):
+                    graph = self + "2:Graph"
+                    nodes = (self + "2:Params-Nodes-Field").value.strip().split(' ')
+                    for node in nodes:
+                        node = graph.get_node(node)
+                        node.sync_stop()
+                    (self + "2:Graph").update()
+                    
             class Initialize(object):
                 def clicked(self, path):
                     graph = self + "2:Graph"

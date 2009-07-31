@@ -50,6 +50,8 @@
     <w:Button id="RevSync" title="Sync reverse" />
     <w:Button id="SyncBoth" title="Sync bidirectional" />
     <w:Button id="SyncAll" title="Sync all" />
+    <w:Button id="StartThreadSync" title="Start background sync" />
+    <w:Button id="StopThreadSync" title="Stop background sync" />
 
     <w:Button id="Initialize" title="Initialize host" />
     <w:Button id="CreateTestData" title="Create test data" />

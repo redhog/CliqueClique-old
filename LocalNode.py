@@ -3,8 +3,9 @@ from __future__ import with_statement
 import datetime, md5, threading, operator
 import Utils, Tables, Node
 
-debug_sync = False
+debug_sync = True
 debug_sync_event_wait = False
+debug_sync_connect = False
 reconnect_delay = 10.0
 
 class SyncNode(Node.Node):
@@ -28,7 +29,7 @@ class SyncNode(Node.Node):
 
         subscription, message, delete_subscription = self.get_subscription_update(other.node_id)
         if debug_sync:
-            print "Sync: %s -> %s : %s, %s, delete:%s" % (self.node_id, other.node_id, subscription, message, delete_subscription)
+            print "Sync: %s -> %s : %s, %s, delete:%s" % (self.id2s(self.node_id), self.id2s(other.node_id), subscription, message, delete_subscription)
         if subscription:
             if delete_subscription:
                 other.delete_subscription(subscription)
@@ -60,11 +61,11 @@ class SyncNode(Node.Node):
 
     def get_peers(self, *arg, **kw):
         return [obj['peer_id']
-                for obj in Tables.Peer.select_objs_sql(self.conn, self.node_id, *arg, **kw)]
+                for obj in Tables.Peer.select_objs(self.conn, self.node_id, *arg, **kw)]
 
     def get_peer(self, peer_id):
         # Add XMLL-RPC connect interface here...
-        self.host.get_node(peer_id)
+        return self.host.get_node(peer_id)
 
 class ThreadSyncNode(SyncNode):
     def __init__(self, *arg, **kw):
@@ -73,22 +74,23 @@ class ThreadSyncNode(SyncNode):
         self._sync_outbound_shutdown = False
         self.sync_peers = []
         self.sync_outbound_thread = self.OutboundSyncThread(self)
-        self.sync_outbound_connection_manager_hread = self.OutboundConnectionManagerThread(self)
+        self.sync_outbound_connection_manager_thread = self.OutboundConnectionManagerThread(self)
 
     def sync_start(self):
         self.sync_outbound_thread.start()
+        self.sync_outbound_connection_manager_thread.start()
         
     def sync_stop(self):
         self._sync_outbound_shutdown = True
         self.sync_signal_event()
 
     def sync_wait_for_event(self, timeout = None):
-        self._sync_new_event.aquire()
+        self._sync_new_event.acquire()
         self._sync_new_event.wait(timeout)
         self._sync_new_event.release()
 
     def sync_signal_event(self):
-        self._sync_new_event.aquire()
+        self._sync_new_event.acquire()
         self._sync_new_event.notifyAll()
         self._sync_new_event.release()
 
@@ -107,20 +109,25 @@ class ThreadSyncNode(SyncNode):
                 self, name = "OutboundConnectionManagerThread for %s" % (node.node_id,), *arg, **kw)
 
         def run(self):
-            print "%s: Starting...." % self.name
+            print "%s: Starting...." % self.getName()
             while not self.node._sync_outbound_shutdown:
                 peer_ids = [peer.node_id for peer in self.node.sync_peers]
                 if not peer_ids:
-                    sql = ''
-                if len(peer_ids) == 1:
-                    sql = 'peer_id != ?'
+                    sql = 'true'
+                elif len(peer_ids) == 1:
+                    sql = 'peer_id != %s'
                 else:
-                    sql = 'peer_id not in (%s)' % (', '.join('?' for peer_id in peer_ids),)
-                non_connected_peers = self.get_peers(_query_sql=(sql, peer_ids))
-                for peer in non_connected_peers:
-                    peer = self.node.get_peer(peer['peer_id'])
+                    sql = 'peer_id not in (%s)' % (', '.join('%s' for peer_id in peer_ids),)
+                non_connected_peers = self.node.get_peers(_query_sql=(sql, peer_ids))
+                for peer_id in non_connected_peers:
+                    peer = self.node.get_peer(peer_id)
                     if peer:
+                        if debug_sync_connect: print "%s: Connected to peer: %s" % (self.getName(), peer_id)
                         self.node.sync_add_peer(peer)
+                    else:
+                        if debug_sync_connect: print "%s: Unable to connect to peer: %s" % (self.getName(), peer_id)
+                    if self.node._sync_outbound_shutdown: return                
+                if debug_sync_event_wait: print "%s: Waiting..." % (self.getName(),)
                 self.node.sync_wait_for_event(reconnect_delay)
 
     class OutboundSyncThread(threading.Thread):
@@ -130,7 +137,7 @@ class ThreadSyncNode(SyncNode):
                 self, name = "OutboundSyncThread for %s" % (node.node_id,), *arg, **kw)
 
         def run(self):
-            print "%s: Starting...." % self.name
+            print "%s: Starting...." % self.getName()
             while not self.node._sync_outbound_shutdown:
                 syncs = 0
                 for peer in list(self.node.sync_peers): # Copy to avoid list changing under our feet...
@@ -140,9 +147,9 @@ class ThreadSyncNode(SyncNode):
                         import traceback
                         traceback.print_exc()
                         self.node.sync_remove_peer(peer)
-                    if self.node.s_sync_outbound_shutdown: return                
+                    if self.node._sync_outbound_shutdown: return                
                 if not syncs:
-                    if debug_sync_event_wait: print "%s: Waiting..." % (self.name,)
+                    if debug_sync_event_wait: print "%s: Waiting..." % (self.getName(),)
                     self.node.sync_wait_for_event()
 
 class IntrospectionNode(Node.Node):
