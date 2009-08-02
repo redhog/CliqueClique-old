@@ -14,9 +14,6 @@ class HostedNode(Node.Node):
         Node.Node.__init__(self, conn, node_id)
 
 class SyncNode(HostedNode):
-    def begin(self):
-        self._conn.begin()
-
     def commit(self):
         self._conn.commit()
 
@@ -94,7 +91,6 @@ class SyncNode(HostedNode):
 
             def wrap(local, member):
                 def wrapper(*arg, **kw):
-                    local.begin()
                     try:
                         try:
                             return member(*arg, **kw)
