@@ -46,8 +46,10 @@ class NodeOperations(object):
                                                            cls.id2s(cls.calculate_message_id(message))))
 
 class Node(NodeOperations):
+    node_id = None
+    
     def __init__(self, conn, node_id, host):
-        self.conn = conn
+        self._conn = conn
         self.node_id = node_id
         self.host = host
         if self.get_local_node() is None:
@@ -59,7 +61,7 @@ class Node(NodeOperations):
 
     def _register_peer(self, peer):
         Tables.Peer.create_or_update(
-            self.conn,
+            self._conn,
             Utils.subclass_dict(peer,
                                 {'node_id': self.node_id,
                                  'last_seen_time': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}))
@@ -70,22 +72,22 @@ class Node(NodeOperations):
                                 {'do_mirror': 0}))
     
     def get_peer(self, peer_id):
-        return Tables.Peer.select_obj(self.conn, self.node_id, peer_id)
+        return Tables.Peer.select_obj(self._conn, self.node_id, peer_id)
 
     def get_local_node(self):
-        return Tables.Peer.select_obj(self.conn, self.node_id, self.node_id)
+        return Tables.Peer.select_obj(self._conn, self.node_id, self.node_id)
 
     def challenge_message(self, message_challenge):
         return Tables.Message.select_obj(
-            self.conn, self.node_id, message_challenge = message_challenge
+            self._conn, self.node_id, message_challenge = message_challenge
             )['message_response']
 
     def get_message(self, message_id):
-        return Tables.Message.select_obj(self.conn, self.node_id, message_id)
+        return Tables.Message.select_obj(self._conn, self.node_id, message_id)
 
     def _register_message(self, message):
         Tables.Message.create_or_update(
-            self.conn,
+            self._conn,
             Utils.subclass_dict(message,
                                 {'node_id': self.node_id,
                                  'message_response': self.calculate_message_response(self.node_id, message)}))
@@ -103,7 +105,7 @@ class Node(NodeOperations):
         if not self.get_message(subscription['message_id']):
             raise Exception("Message to subscribe, %s does not exist at peer %s" % (subscription['message_id'], self.node_id))
         Tables.Subscription.create_or_update(
-            self.conn,
+            self._conn,
             Utils.subclass_dict(subscription,
                                 {'node_id': self.node_id}))
 
@@ -111,22 +113,22 @@ class Node(NodeOperations):
         if debug_delete_subscription:
             print "Delete subscription: node=%s peer=%s message=%s" % (self.node_id, subscription['peer_id'], subscription['message_id'])
         Tables.Subscription.delete(
-            self.conn,
+            self._conn,
             self.node_id,
             subscription['peer_id'],
             subscription['message_id'])
-        other_subscription = Tables.Subscription.select_obj(self.conn, self.node_id, message_id=subscription['message_id'])
+        other_subscription = Tables.Subscription.select_obj(self._conn, self.node_id, message_id=subscription['message_id'])
         if other_subscription is None:
             if debug_delete_message:
                 print "Delete message: node=%s message=%s" % (self.node_id, subscription['message_id'])
             Tables.Message.delete(
-                self.conn,
+                self._conn,
                 self.node_id,
                 subscription['message_id'])
 
     # Returns (subscription, message)
     def get_subscription_update(self, peer_id):
-        update = Tables.SubscriptionUpdates.select_obj(self.conn, self.node_id, peer_id)
+        update = Tables.SubscriptionUpdates.select_obj(self._conn, self.node_id, peer_id)
 
         if not update:
             return None, None, None
@@ -140,10 +142,10 @@ class Node(NodeOperations):
                  'local_center_node': update['center_node'],
                  'local_center_distance': update['center_distance']})
         
-        local_subscription = Tables.Subscription.select_obj(self.conn, self.node_id, peer_id, update['message_id'])
+        local_subscription = Tables.Subscription.select_obj(self._conn, self.node_id, peer_id, update['message_id'])
         message = None
         if update['send_message']:
-            message = Tables.Message.select_obj(self.conn, self.node_id, update['message_id'])
+            message = Tables.Message.select_obj(self._conn, self.node_id, update['message_id'])
 
         subscription = dict(local_subscription)
         subscription['peer_id'], subscription['node_id'] = subscription['node_id'], subscription['peer_id']

@@ -8,15 +8,23 @@ debug_sync_event_wait = False
 debug_sync_connect = False
 reconnect_delay = 10.0
 
-class SyncNode(Node.Node):
+class HostedNode(Node.Node):
+    def __init__(self, conn, node_id, host):
+    self.host = host
+    Node.Node.__init__(conn, node_id)
+
+class SyncNode(HostedNode):
+    def begin(self):
+        self._conn.begin()
+
     def commit(self):
-        self.conn.commit()
+        self._conn.commit()
 
     def rollback(self):
-        self.conn.rollback()
+        self._conn.rollback()
 
     def close(self):
-        self.conn.close()
+        self._conn.close()
 
     # Sync peers locally (where both are LocalNode:s). Note that we
     # introduce disorder in the syncing order to crack loops.
@@ -70,7 +78,7 @@ class SyncNode(Node.Node):
 
     def get_peers(self, *arg, **kw):
         return [obj['peer_id']
-                for obj in Tables.Peer.select_objs(self.conn, self.node_id, *arg, **kw)]
+                for obj in Tables.Peer.select_objs(self._conn, self.node_id, *arg, **kw)]
 
     def get_peer(self, peer_id):
         # Add XMLL-RPC connect interface here...
@@ -85,6 +93,7 @@ class SyncNode(Node.Node):
                 raise AttributeError("You can not use methods meant for the local node on peers, even when connected to them locally.", name)
             def commit_wrapper(*arg, **kw):
                 local = object.__getattribute__(self, "_local_peer")
+                local.begin()
                 try:
                     try:
                         return getattr(local, name)(*arg, **kw)
@@ -185,16 +194,16 @@ class ThreadSyncNode(SyncNode):
 
 class IntrospectionNode(Node.Node):
     def _get_messages(self, **kw):
-        return Tables.Message.select_objs(self.conn, node_id = self.node_id, **kw)
+        return Tables.Message.select_objs(self._conn, node_id = self.node_id, **kw)
 
     def _get_local_subscriptions(self, **kw):
-        return Tables.LocalSubscription.select_objs(self.conn, node_id = self.node_id, **kw)
+        return Tables.LocalSubscription.select_objs(self._conn, node_id = self.node_id, **kw)
 
     def _get_subscriptions(self, **kw):
-        return Tables.Subscription.select_objs(self.conn, node_id = self.node_id, **kw)
+        return Tables.Subscription.select_objs(self._conn, node_id = self.node_id, **kw)
 
     def _get_message_links(self, **kw):
-        return Tables.MessageLink.select_objs(self.conn, node_id = self.node_id, **kw)
+        return Tables.MessageLink.select_objs(self._conn, node_id = self.node_id, **kw)
 
 
 class UINode(Node.Node):
@@ -206,7 +215,7 @@ class UINode(Node.Node):
         return message
 
     def update_local_subscription(self, message, subscribed = 1):
-        subscription = Tables.Subscription.select_obj(self.conn, node_id = self.node_id, peer_id = self.node_id, message_id = message['message_id'])
+        subscription = Tables.Subscription.select_obj(self._conn, node_id = self.node_id, peer_id = self.node_id, message_id = message['message_id'])
         if subscription is None:
             subscription = {'peer_id': self.node_id,
                             'message_id': message['message_id'],
@@ -220,7 +229,7 @@ class UINode(Node.Node):
         self.update_subscription(subscription)
 
     def delete_local_subscription(self, message):
-        subscription = Tables.Subscription.select_obj(self.conn, node_id = self.node_id, peer_id = self.node_id, message_id = message['message_id'])
+        subscription = Tables.Subscription.select_obj(self._conn, node_id = self.node_id, peer_id = self.node_id, message_id = message['message_id'])
         if subscription is not None:
             self.delete_subscription(subscription)
 
