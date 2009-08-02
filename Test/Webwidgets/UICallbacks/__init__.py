@@ -21,7 +21,6 @@
 
 import pydot
 import Webwidgets
-import sqlite3
 import md5
 import CliqueClique.Host, CliqueClique.Node, CliqueClique.Visualizer, CliqueClique.Tables
 
