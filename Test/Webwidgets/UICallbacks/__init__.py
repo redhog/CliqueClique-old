@@ -74,7 +74,7 @@ class MainWindow(object):
 
             def add_message(self, node, message, local_subscription, **kw):
                 id_name = '%s:%s' % (node.id2s(node.node_id),
-                                     message['message_id'])
+                                     node.id2s(message['message_id']))
                 if id_name in (self + "1:Params-Messages-Field").value:
                     kw['style'] = 'filled'
                     kw['fillcolor'] = self.message_color
