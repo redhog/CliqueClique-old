@@ -9,6 +9,15 @@ debug_sync_connect = False
 reconnect_delay = 10.0
 
 class SyncNode(Node.Node):
+    def commit(self):
+        self.conn.commit()
+
+    def rollback(self):
+        self.conn.rollback()
+
+    def close(self):
+        self.conn.close()
+
     # Sync peers locally (where both are LocalNode:s). Note that we
     # introduce disorder in the syncing order to crack loops.
     # However we're lazy and don't use real randomness, which we should...
@@ -65,7 +74,25 @@ class SyncNode(Node.Node):
 
     def get_peer(self, peer_id):
         # Add XMLL-RPC connect interface here...
-        return self.host.get_node(peer_id)
+        return self.LocalPeerConnector(self.host.get_node(peer_id))
+
+    class LocalPeerConnector(object):
+        def __init__(self, local_peer):
+            self._local_peer = local_peer
+            
+        def __getattribute__(self, name):
+            if not hasattr(Node.Node, name):
+                raise AttributeError("You can not use methods meant for the local node on peers, even when connected to them locally.", name)
+            def commit_wrapper(*arg, **kw):
+                local = object.__getattribute__(self, "_local_peer")
+                try:
+                    try:
+                        return getattr(local, name)(*arg, **kw)
+                    except:
+                        local.rollback()
+                finally:
+                    local.commit()
+            return commit_wrapper
 
 class ThreadSyncNode(SyncNode):
     def __init__(self, *arg, **kw):
@@ -108,6 +135,8 @@ class ThreadSyncNode(SyncNode):
             threading.Thread.__init__(
                 self, name = "OutboundConnectionManagerThread for %s" % (node.node_id,), *arg, **kw)
 
+        #FIXME: Handle commits for local node, and handle commits for local peers somehow
+
         def run(self):
             print "%s: Starting...." % self.getName()
             while not self.node._sync_outbound_shutdown:
@@ -147,7 +176,9 @@ class ThreadSyncNode(SyncNode):
                         import traceback
                         traceback.print_exc()
                         self.node.sync_remove_peer(peer)
-                    if self.node._sync_outbound_shutdown: return                
+                    if self.node._sync_outbound_shutdown: return
+                self.node.sync_self()
+                if self.node._sync_outbound_shutdown: return
                 if not syncs:
                     if debug_sync_event_wait: print "%s: Waiting..." % (self.getName(),)
                     self.node.sync_wait_for_event()

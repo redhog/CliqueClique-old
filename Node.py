@@ -155,9 +155,3 @@ class Node(NodeOperations):
             self.delete_subscription(local_subscription)
 
         return subscription, message, update['delete_subscription']
-
-    def commit(self):
-        self.conn.commit()
-
-    def close(self):
-        self.conn.close()
