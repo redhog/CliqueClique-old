@@ -48,10 +48,9 @@ class NodeOperations(object):
 class Node(NodeOperations):
     node_id = None
     
-    def __init__(self, conn, node_id, host):
+    def __init__(self, conn, node_id):
         self._conn = conn
         self.node_id = node_id
-        self.host = host
         if self.get_local_node() is None:
             self._initialize()
 

@@ -1,6 +1,6 @@
 from __future__ import with_statement
 
-import datetime, md5, threading, operator
+import datetime, md5, threading, operator, types
 import Utils, Tables, Node
 
 debug_sync = True
@@ -10,8 +10,8 @@ reconnect_delay = 10.0
 
 class HostedNode(Node.Node):
     def __init__(self, conn, node_id, host):
-    self.host = host
-    Node.Node.__init__(conn, node_id)
+        self.host = host
+        Node.Node.__init__(self, conn, node_id)
 
 class SyncNode(HostedNode):
     def begin(self):
@@ -91,17 +91,25 @@ class SyncNode(HostedNode):
         def __getattribute__(self, name):
             if not hasattr(Node.Node, name):
                 raise AttributeError("You can not use methods meant for the local node on peers, even when connected to them locally.", name)
-            def commit_wrapper(*arg, **kw):
-                local = object.__getattribute__(self, "_local_peer")
-                local.begin()
-                try:
+
+            def wrap(local, member):
+                def wrapper(*arg, **kw):
+                    local.begin()
                     try:
-                        return getattr(local, name)(*arg, **kw)
-                    except:
-                        local.rollback()
-                finally:
-                    local.commit()
-            return commit_wrapper
+                        try:
+                            return member(*arg, **kw)
+                        except:
+                            local.rollback()
+                    finally:
+                        local.commit()
+                return wrapper
+
+            local = object.__getattribute__(self, "_local_peer")
+            member = getattr(local, name)
+            if not isinstance(member, types.MethodType):
+                return member
+            return wrap(local, member)
+
 
 class ThreadSyncNode(SyncNode):
     def __init__(self, *arg, **kw):

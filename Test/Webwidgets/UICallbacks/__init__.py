@@ -296,7 +296,7 @@ class MainWindow(object):
                     res[node_id] = {}
                     for peer_id in node_ids:
                         res[node_id][peer_id] = CliqueClique.Tables.SubscriptionUpdates.select_objs(
-                            node.conn, node.node_id, peer_id)
+                            node._conn, node.node_id, peer_id)
 
                 return """
 <table>
