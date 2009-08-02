@@ -9,9 +9,9 @@ debug_sync_connect = False
 reconnect_delay = 10.0
 
 class HostedNode(Node.Node):
-    def __init__(self, conn, node_id, host):
+    def __init__(self, _conn, node_id, host):
         self.host = host
-        Node.Node.__init__(self, conn, node_id)
+        Node.Node.__init__(self, _conn, node_id)
 
 class SyncNode(HostedNode):
     def commit(self):
