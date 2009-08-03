@@ -116,6 +116,12 @@ class ThreadSyncNode(SyncNode):
         self.sync_outbound_thread = self.OutboundSyncThread(self)
         self.sync_outbound_connection_manager_thread = self.OutboundConnectionManagerThread(self)
 
+    def commit(self):
+        print "commit:%s:commit" % threading.currentThread().getName() 
+        SyncNode.commit(self)
+        print "commit:%s:sync_signal_event" % threading.currentThread().getName() 
+        self.sync_signal_event()
+
     def sync_start(self):
         self.sync_outbound_thread.start()
         self.sync_outbound_connection_manager_thread.start()
@@ -125,13 +131,19 @@ class ThreadSyncNode(SyncNode):
         self.sync_signal_event()
 
     def sync_wait_for_event(self, timeout = None):
+        print "sync_wait_for_event:%s:acquire" % threading.currentThread().getName() 
         self._sync_new_event.acquire()
+        print "sync_wait_for_event:%s:wait" % threading.currentThread().getName() 
         self._sync_new_event.wait(timeout)
+        print "sync_wait_for_event:%s:release" % threading.currentThread().getName() 
         self._sync_new_event.release()
 
     def sync_signal_event(self):
+        print "sync_signal_event:%s:acquire" % threading.currentThread().getName() 
         self._sync_new_event.acquire()
+        print "sync_signal_event:%s:notifyAll" % threading.currentThread().getName() 
         self._sync_new_event.notifyAll()
+        print "sync_signal_event:%s:release" % threading.currentThread().getName() 
         self._sync_new_event.release()
 
     def sync_add_peer(self, peer):
