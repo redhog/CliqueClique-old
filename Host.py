@@ -3,13 +3,12 @@ from __future__ import with_statement
 import contextlib, datetime, md5, os.path, Utils, Tables, Node, LocalNode, Config
 
 class Host(object):
-    def __init__(self, engine = None):
-        self._conn_factory = engine or Config.database_engine
+    def __init__(self, conn = None):
         self.node_cache = {}
-        self.conn = self._conn_factory()
+        self.conn = conn or Config.database_engine()
 
     def _get_node(self, node_id):
-        return LocalNode.LocalNode(self._conn_factory(), node_id, self)
+        return LocalNode.LocalNode(self.conn, node_id, self)
 
     def get_node(self, node_id, cache = False):
         if not cache:
