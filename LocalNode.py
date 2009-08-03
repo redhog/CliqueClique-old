@@ -92,11 +92,11 @@ class SyncNode(HostedNode):
             def wrap(local, member):
                 def wrapper(*arg, **kw):
                     try:
-                        try:
-                            return member(*arg, **kw)
-                        except:
-                            local.rollback()
-                    finally:
+                        return member(*arg, **kw)
+                    except:
+                        local.rollback()
+                        raise
+                    else:
                         local.commit()
                 return wrapper
 
@@ -198,9 +198,12 @@ class ThreadSyncNode(SyncNode):
                     try:
                         syncs += self.node.sync_peer(peer)
                     except:
+                        self.node.rollback()
                         import traceback
                         traceback.print_exc()
                         self.node.sync_remove_peer(peer)
+                    else:
+                        self.node.commit()
                     if self.node._sync_outbound_shutdown: return
                 self.node.sync_self()
                 if self.node._sync_outbound_shutdown: return
