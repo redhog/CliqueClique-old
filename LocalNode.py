@@ -74,8 +74,9 @@ class SyncNode(HostedNode):
         self.update_local_subscription(message, 0)
 
     def get_peers(self, *arg, **kw):
-        return [obj['peer_id']
-                for obj in Tables.Peer.select_objs(self._conn, self.node_id, *arg, **kw)]
+        with Tables.Peer.select_objs(self._conn, self.node_id, *arg, **kw) as objs:
+            return [obj['peer_id']
+                    for obj in objs]
 
     def get_peer(self, peer_id):
         # Add XMLL-RPC connect interface here...

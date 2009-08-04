@@ -18,6 +18,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+from __future__ import with_statement
 
 import pydot
 import Webwidgets
@@ -295,8 +296,9 @@ class MainWindow(object):
                     node = graph.get_node(graph.id2s(node_id))
                     res[node_id] = {}
                     for peer_id in node_ids:
-                        res[node_id][peer_id] = CliqueClique.Tables.SubscriptionUpdates.select_objs(
-                            node._conn, node.node_id, peer_id)
+                        with CliqueClique.Tables.SubscriptionUpdates.select_objs(
+                            node._conn, node.node_id, peer_id) as subscriptions:
+                            res[node_id][peer_id] = list(subscriptions)
 
                 return """
 <table>

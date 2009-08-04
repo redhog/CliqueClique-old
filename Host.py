@@ -18,8 +18,9 @@ class Host(object):
         return self.node_cache[node_id]
             
     def get_nodes(self):
-        return [obj['node_id']
-                for obj in Tables.Peer.select_objs_sql(self.conn, "node_id = peer_id")]
+        with Tables.Peer.select_objs_sql(self.conn, "node_id = peer_id") as objs:
+            return [obj['node_id']
+                    for obj in objs]
 
     def initialize(self):
         with contextlib.closing(self.conn.cursor()) as cur:

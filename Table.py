@@ -1,6 +1,8 @@
 from __future__ import with_statement
 import contextlib, sys
 
+
+
 class Table(object):
     table_name = None
     id_cols = ()
@@ -12,25 +14,46 @@ class Table(object):
     def _paramstyle_from_conn(cls, conn):
         return cls.paramstyles[sys.modules[conn.__module__].paramstyle]
 
+    class _SelectDicts(object):
+        def __init__(self, conn, *arg, **kw):
+            self.conn = conn
+            self.arg = arg
+            self.kw = kw
+            self.cols = None
+
+        def __enter__(self):
+            self.cur = self.conn.cursor()
+            try:
+                self.cur.execute(*self.arg, **self.kw)
+            except:
+                self.__exit__(*sys.exc_info())
+                raise
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            self.cur.close()
+            if exc_value is not None:
+                exc_value.args = exc_value.args + (self.arg, self.kw)
+
+        def __iter__(self):
+            return self
+
+        def next(self):
+            if not hasattr(self, "cur"): raise Exception("This is not an iterator but a context manager. Please use a with-statement, and iterate over the result variable.")
+            row = self.cur.fetchone()
+            if row is None: raise StopIteration
+            if self.cols is None: self.cols = [dsc[0] for dsc in self.cur.description]
+            return dict(zip(self.cols, row))
+    
     @classmethod
     def _select_dicts(cls, conn, *arg, **kw):
-        try:
-            with contextlib.closing(conn.cursor()) as cur:
-                cur.execute(*arg, **kw)
-                row = cur.fetchone()
-                if row is not None:
-                    cols = [dsc[0] for dsc in cur.description]
-                    while row is not None:
-                        yield dict(zip(cols, row))
-                        row = cur.fetchone()
-        except Exception, e:
-            e.args = e.args + (arg, kw)
-            raise
+        return cls._SelectDicts(conn, *arg, **kw)
                 
     @classmethod
     def _select_dict(cls, conn, *arg, **kw):
-        for result in cls._select_dicts(conn, *arg, **kw):
-            return result
+        with cls._select_dicts(conn, *arg, **kw) as results:
+            for result in results:
+                return result
         return None
 
     @classmethod
@@ -55,9 +78,10 @@ class Table(object):
     
     @classmethod
     def select_obj(cls, conn, *arg, **query):
-        for result in cls.select_objs(conn, *arg, **query):
-            return result
-        return None
+        with cls.select_objs(conn, *arg, **query) as results:
+            for result in results:
+                return result
+            return None
 
     @classmethod
     def select_objs_sql(cls, conn, query_sql, query_params = ()):

@@ -1,3 +1,5 @@
+from __future__ import with_statement
+
 import pydot, CliqueClique.Node
 
 class Visualizer(CliqueClique.Node.NodeOperations):
@@ -34,15 +36,19 @@ class Visualizer(CliqueClique.Node.NodeOperations):
         node_id = node.node_id
         self.clusters[self.id2s(node_id)] = pydot.Cluster(self.id2s(node_id), label='"%s"' % (self._id2label(node_id),), color = self.node_color, **kw)
         self.graph.add_subgraph(self.clusters[self.id2s(node_id)])
-        for message in node._get_messages():
-            local_subscription = list(node._get_local_subscriptions(message_id = message['message_id']))
-            if not local_subscription:
-                local_subscription = [{'is_subscribed': 'n/a', 'center_distance': 'n/a'}]
-            self.add_message(node, message, local_subscription[0])
-        for link in node._get_message_links():
-            self.add_message_link(node, link)
-        for subscription in node._get_subscriptions():
-            self.add_subscription(node, subscription)
+        with node._get_messages() as messages:
+            for message in messages:
+                with node._get_local_subscriptions(message_id = message['message_id']) as local_subscriptions:
+                    local_subscription = list(local_subscriptions)
+                if not local_subscription:
+                    local_subscription = [{'is_subscribed': 'n/a', 'center_distance': 'n/a'}]
+                self.add_message(node, message, local_subscription[0])
+        with node._get_message_links() as message_links:
+            for link in message_links:
+                self.add_message_link(node, link)
+        with node._get_subscriptions() as subscriptions:
+            for subscription in subscriptions:
+                self.add_subscription(node, subscription)
         
     def add_message(self, node, message, local_subscription, **kw):
         data = dict(message)
