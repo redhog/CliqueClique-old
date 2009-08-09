@@ -1,0 +1,66 @@
+# -*- mode: org; coding: utf-8 -*-
+
+#+TITLE: Installation instructions for the CliqueClique test environment
+#+AUTHOR: Nicklas Lindgren
+#+EMAIL: nili@gulmohar.se
+#+LANGUAGE: en
+
+* Requirements
+
+  CliqueClique itself requires only *PostgreSQL*. Version *8.3.7* is
+  known to work. *pyPgSQL* is used for interfacing with PostgreSQL.
+
+  The Ubuntu package for pyPgSQL is called python-pgsql. The package
+  supports PostgreSQL 8, even though the package description does not
+  specify that.
+
+  The test environment uses *[[https://projects.freecode.no/projects/show/webwidgets][Redback Webwidgets]]*, with the
+  Graphviz-widget, which currently is only available in the
+  bleeding-edge development version. The Graphviz-widget
+  requires *pydot*.
+
+  Webwidgets require *Python 2.5*. Python 2.4 or 2.6 are currently not
+  supported.
+
+  Webwidgets require *[[http://www.webwareforpython.org/][Webware]]*. Version *1.0.2* is known to work.
+
+* Installation
+** CliqueClique and PostgreSQL
+
+  Place CliqueClique anywhere you like. Make sure pyPgSQL is
+  installed.
+
+  Make sure the PostgreSQL user and database specified in Config.py
+  exists.
+
+  When running webware (by running the WebKit/AppServer script), make
+  sure your PYTHONPATH includes the directory that contains your
+  CliqueClique directory.
+
+** Webwidgets
+
+  Get Webwidgets and put it in your site-packages directory, which is
+  likely to be /usr/lib/python2.5/site-packages . Make sure pydot is
+  installed.
+
+** Webware
+
+  Get Webware and put it anywhere you like. Run its install.py-script
+  with Python 2.5.
+
+  Edit the file WebKit/Configs/Application.config to include the line:
+
+    Contexts['cliqueclique'] = '/YOUR/PATH/TO/CliqueClique/Test/Webwidgets/Webware'
+
+  And change the ExtraPathInfo line to:
+
+    ExtraPathInfo = True
+
+  You will probably want to edit WebKit/AppServer, and change the
+  PYTHON line to:
+
+    PYTHON=python2.5
+
+  If you want your Webware server to listen for connections other than
+  from localhost edit the WebKit/Configs/AppServer.config
+  appropriately.
