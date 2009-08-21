@@ -78,4 +78,5 @@ class Visualizer(CliqueClique.Node.NodeOperations):
         
     def add_host(self, host):
         for node_id in host.get_nodes():
-            self.add_node(host.get_node(node_id))
+            node = host.get_node(node_id, cache=True)
+            self.add_node(node)

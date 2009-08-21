@@ -5,8 +5,8 @@ import contextlib, datetime, md5, os.path, Utils, Tables, Node, LocalNode, Confi
 class Host(object):
     def __init__(self, engine = None):
         self._conn_factory = engine or Config.database_engine
-        self.node_cache = {}
-        self.conn = self._conn_factory()
+        self._node_cache = {}
+        self._conn = self._conn_factory()
 
     def _get_node(self, node_id):
         return LocalNode.LocalNode(self._conn_factory(), node_id, self)
@@ -14,22 +14,33 @@ class Host(object):
     def get_node(self, node_id, cache = False):
         if not cache:
             return self._get_node(node_id)
-        if node_id not in self.node_cache:
-            self.node_cache[node_id] = self._get_node(node_id)
-        return self.node_cache[node_id]
+        if node_id not in self._node_cache:
+            self._node_cache[node_id] = self._get_node(node_id)
+        return self._node_cache[node_id]
             
     def get_nodes(self):
         return [obj['node_id']
-                for obj in Tables.Peer.select_objs_sql(self.conn, "node_id = peer_id")]
+                for obj in Tables.Peer.select_objs_sql(self._conn, "node_id = peer_id")]
 
     def initialize(self):
-        with contextlib.closing(self.conn.cursor()) as cur:
+        self._node_cache = {}
+        with contextlib.closing(self._conn.cursor()) as cur:
             for part in ("tables.sql", "views.sql"):
                 with open(os.path.join(os.path.dirname(__file__), part)) as f:
                     cur.execute(f.read())
-        self.conn.commit()
+        self._conn.commit()
+
+    def commit(self):
+        self._conn.commit()
+        for node in self._node_cache.values():
+            node.commit()
+
+    def rollback(self):
+        self._conn.rollback()
+        for node in self._node_cache.values():
+            node.rollback()
 
     def close(self):
-        self.conn.close()
-        for node in self.node_cache.values():
+        self._conn.close()
+        for node in self._node_cache.values():
             node.close()
