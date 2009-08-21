@@ -78,11 +78,13 @@ class Table(object):
         
         with contextlib.closing(conn.cursor()) as cur:
             if existing:
-                query_sql, query_params = cls._get_query(conn, *id_col_values)
-                cur.execute("""update %s set %s where %s""" % (cls.table_name,
-                                                               ', '.join("%s = %s" % (col, cls._paramstyle_from_conn(conn)) for col in obj_non_id_cols),
-                                                               query_sql),
-                            [obj[col] for col in obj_non_id_cols] + query_params)
+                if obj_non_id_cols:
+
+                    query_sql, query_params = cls._get_query(conn, *id_col_values)
+                    cur.execute("""update %s set %s where %s""" % (cls.table_name,
+                                                                   ', '.join("%s = %s" % (col, cls._paramstyle_from_conn(conn)) for col in obj_non_id_cols),
+                                                                   query_sql),
+                                [obj[col] for col in obj_non_id_cols] + query_params)
             else:
                 query = """insert into %s (%s) values (%s)""" % (cls.table_name,
                                                                      ', '.join(obj_cols),

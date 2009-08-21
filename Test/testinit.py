@@ -29,16 +29,10 @@ host = CliqueClique.Host.Host()
 class Th(threading.Thread):
     def run(self):
         print "Begin: %s" % (self.getName())
-
         host.initialize()
 
-        poster_node = host.get_node(CliqueClique.Node.NodeOperations.s2id( md5.md5("node_1").hexdigest()), True)
-        other_node = host.get_node(CliqueClique.Node.NodeOperations.s2id( md5.md5("node_2").hexdigest()), True)
-
-        msg = poster_node.post_text_message('Root message')
-        other_node.import_message_from_peer(poster_node, msg['message_id'])
-        poster_node.commit()
-        other_node.commit()
+        poster_node = host.get_node(CliqueClique.Node.NodeOperations.s2id( md5.md5("node_1").hexdigest()))
+        
         print "Done: %s" % (self.getName())
 
 for x in (1, 2):
