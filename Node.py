@@ -53,6 +53,7 @@ class Node(NodeOperations):
         self.node_id = node_id
         if self.get_local_node() is None:
             self._initialize()
+            self.commit()
 
     def _initialize(self):
         self._register_peer({'peer_id': self.node_id,

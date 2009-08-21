@@ -32,6 +32,8 @@ class Th(threading.Thread):
         host.initialize()
 
         poster_node = host.get_node(CliqueClique.Node.NodeOperations.s2id( md5.md5("node_1").hexdigest()))
+        poster_node.commit()
+        host.commit()
         
         print "Done: %s" % (self.getName())
 

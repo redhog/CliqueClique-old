@@ -109,12 +109,12 @@ class SyncNode(HostedNode):
 
 class ThreadSyncNode(SyncNode):
     def __init__(self, *arg, **kw):
-        super(ThreadSyncNode, self).__init__(*arg, **kw)
         self._sync_new_event = threading.Condition()
         self._sync_outbound_shutdown = False
         self.sync_peers = []
         self.sync_outbound_thread = self.OutboundSyncThread(self)
         self.sync_outbound_connection_manager_thread = self.OutboundConnectionManagerThread(self)
+        super(ThreadSyncNode, self).__init__(*arg, **kw)
 
     def commit(self):
         print "commit:%s:commit" % threading.currentThread().getName() 
