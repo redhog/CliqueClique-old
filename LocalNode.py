@@ -173,8 +173,10 @@ class ThreadSyncNode(SyncNode):
                 else:
                     sql = 'peer_id not in (%s)' % (', '.join('%s' for peer_id in peer_ids),)
                 non_connected_peers = self.node.get_peers(_query_sql=(sql, peer_ids))
+                self.node.host.commit()
                 for peer_id in non_connected_peers:
                     peer = self.node.get_peer(peer_id)
+                    self.node.host.commit()
                     if peer:
                         if debug_sync_connect: print "%s: Connected to peer: %s" % (self.getName(), peer_id)
                         self.node.sync_add_peer(peer)
@@ -197,12 +199,14 @@ class ThreadSyncNode(SyncNode):
                 for peer in list(self.node.sync_peers): # Copy to avoid list changing under our feet...
                     try:
                         syncs += self.node.sync_peer(peer)
+                        self.node.commit()
                     except:
                         import traceback
                         traceback.print_exc()
                         self.node.sync_remove_peer(peer)
                     if self.node._sync_outbound_shutdown: return
                 self.node.sync_self()
+                self.node.commit()
                 if self.node._sync_outbound_shutdown: return
                 if not syncs:
                     if debug_sync_event_wait: print "%s: Waiting..." % (self.getName(),)
