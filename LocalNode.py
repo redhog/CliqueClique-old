@@ -75,8 +75,9 @@ class SyncNode(HostedNode):
         self.update_local_subscription(message, 0)
 
     def get_peers(self, *arg, **kw):
-        return [obj['peer_id']
-                for obj in Tables.Peer.select_objs(self._conn, self.node_id, *arg, **kw)]
+        with Tables.Peer.select_objs(self._conn, self.node_id, *arg, **kw) as objs:
+            return [obj['peer_id']
+                    for obj in objs]
 
     def get_peer(self, peer_id):
         # Add XMLL-RPC connect interface here...
@@ -96,11 +97,11 @@ class SyncNode(HostedNode):
             def wrap(local, member):
                 def wrapper(*arg, **kw):
                     try:
-                        try:
-                            return member(*arg, **kw)
-                        except:
-                            local.rollback()
-                    finally:
+                        return member(*arg, **kw)
+                    except:
+                        local.rollback()
+                        raise
+                    else:
                         local.commit()
                 return wrapper
 
@@ -191,6 +192,7 @@ class ThreadSyncNode(SyncNode):
                         syncs += self.subject.sync_peer(peer)
                         self.subject.commit()
                     except:
+                        self.node.rollback()
                         import traceback
                         traceback.print_exc()
                         self.subject.sync_remove_peer(peer)
