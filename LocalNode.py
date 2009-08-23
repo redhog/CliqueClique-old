@@ -2,6 +2,7 @@ from __future__ import with_statement
 
 import datetime, md5, threading, operator, types
 import Utils, Tables, Node
+import symmetricjsonrpc
 
 debug_sync = True
 debug_sync_event_wait = False
@@ -82,6 +83,9 @@ class SyncNode(HostedNode):
         return self.LocalPeerConnector(self.host.get_node(peer_id))
 
     class LocalPeerConnector(object):
+        """Wrapper for Node that hides all methods that shouldn't be
+        allowed to be accessed from remote hosts."""
+        
         def __init__(self, local_peer):
             self._local_peer = local_peer
             
@@ -110,7 +114,6 @@ class SyncNode(HostedNode):
 class ThreadSyncNode(SyncNode):
     def __init__(self, *arg, **kw):
         self._sync_new_event = threading.Condition()
-        self._sync_outbound_shutdown = False
         self.sync_peers = []
         self.sync_outbound_thread = self.OutboundSyncThread(self)
         self.sync_outbound_connection_manager_thread = self.OutboundConnectionManagerThread(self)
@@ -127,7 +130,8 @@ class ThreadSyncNode(SyncNode):
         self.sync_outbound_connection_manager_thread.start()
         
     def sync_stop(self):
-        self._sync_outbound_shutdown = True
+        self.sync_outbound_thread.shutdown()
+        self.sync_outbound_connection_manager_thread.shutdown()
         self.sync_signal_event()
 
     def sync_wait_for_event(self, timeout = None):
@@ -154,63 +158,49 @@ class ThreadSyncNode(SyncNode):
         self.sync_peers.remove(peer)
         self.sync_signal_event()
 
-    class OutboundConnectionManagerThread(threading.Thread):
-        def __init__(self, node, *arg, **kw):
-            self.node = node
-            threading.Thread.__init__(
-                self, name = "OutboundConnectionManagerThread for %s" % (node.node_id,), *arg, **kw)
-
-        #FIXME: Handle commits for local node, and handle commits for local peers somehow
-
-        def run(self):
-            print "%s: Starting...." % self.getName()
-            while not self.node._sync_outbound_shutdown:
-                peer_ids = [peer.node_id for peer in self.node.sync_peers]
+    class OutboundConnectionManagerThread(symmetricjsonrpc.Thread):
+        def run_thread(self):
+            while not self._shutdown:
+                peer_ids = [peer.node_id for peer in self.subject.sync_peers]
                 if not peer_ids:
                     sql = 'true'
                 elif len(peer_ids) == 1:
                     sql = 'peer_id != %s'
                 else:
                     sql = 'peer_id not in (%s)' % (', '.join('%s' for peer_id in peer_ids),)
-                non_connected_peers = self.node.get_peers(_query_sql=(sql, peer_ids))
-                self.node.host.commit()
+                non_connected_peers = self.subject.get_peers(_query_sql=(sql, peer_ids))
+                self.subject.host.commit()
                 for peer_id in non_connected_peers:
-                    peer = self.node.get_peer(peer_id)
-                    self.node.host.commit()
+                    peer = self.subject.get_peer(peer_id)
+                    self.subject.host.commit()
                     if peer:
                         if debug_sync_connect: print "%s: Connected to peer: %s" % (self.getName(), peer_id)
-                        self.node.sync_add_peer(peer)
+                        self.subject.sync_add_peer(peer)
                     else:
                         if debug_sync_connect: print "%s: Unable to connect to peer: %s" % (self.getName(), peer_id)
-                    if self.node._sync_outbound_shutdown: return                
+                    if self._shutdown: return                
                 if debug_sync_event_wait: print "%s: Waiting..." % (self.getName(),)
-                self.node.sync_wait_for_event(reconnect_delay)
+                self.subject.sync_wait_for_event(reconnect_delay)
 
-    class OutboundSyncThread(threading.Thread):
-        def __init__(self, node, *arg, **kw):
-            self.node = node
-            threading.Thread.__init__(
-                self, name = "OutboundSyncThread for %s" % (node.node_id,), *arg, **kw)
-
-        def run(self):
-            print "%s: Starting...." % self.getName()
-            while not self.node._sync_outbound_shutdown:
+    class OutboundSyncThread(symmetricjsonrpc.Thread):
+        def run_thread(self):
+            while not self._shutdown:
                 syncs = 0
-                for peer in list(self.node.sync_peers): # Copy to avoid list changing under our feet...
+                for peer in list(self.subject.sync_peers): # Copy to avoid list changing under our feet...
                     try:
-                        syncs += self.node.sync_peer(peer)
-                        self.node.commit()
+                        syncs += self.subject.sync_peer(peer)
+                        self.subject.commit()
                     except:
                         import traceback
                         traceback.print_exc()
-                        self.node.sync_remove_peer(peer)
-                    if self.node._sync_outbound_shutdown: return
-                self.node.sync_self()
-                self.node.commit()
-                if self.node._sync_outbound_shutdown: return
+                        self.subject.sync_remove_peer(peer)
+                    if self._shutdown: return
+                self.subject.sync_self()
+                self.subject.commit()
+                if self._shutdown: return
                 if not syncs:
                     if debug_sync_event_wait: print "%s: Waiting..." % (self.getName(),)
-                    self.node.sync_wait_for_event()
+                    self.subject.sync_wait_for_event()
 
 class IntrospectionNode(Node.Node):
     def _get_messages(self, **kw):
