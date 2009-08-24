@@ -9,7 +9,7 @@ class Host(object):
         self._conn = self._conn_factory()
 
     def _get_node(self, node_id):
-        return LocalNode.LocalNode(self.conn, node_id, self)
+        return LocalNode.LocalNode(self._conn, node_id, self)
 
     def get_node(self, node_id, cache = False):
         if not cache:
@@ -19,7 +19,7 @@ class Host(object):
         return self._node_cache[node_id]
             
     def get_nodes(self):
-        with Tables.Peer.select_objs_sql(self.conn, "node_id = peer_id") as objs:
+        with Tables.Peer.select_objs_sql(self._conn, "node_id = peer_id") as objs:
             return [obj['node_id']
                     for obj in objs]
 
