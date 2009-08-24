@@ -171,10 +171,10 @@ class ThreadSyncNode(SyncNode):
                 else:
                     sql = 'peer_id not in (%s)' % (', '.join('%s' for peer_id in peer_ids),)
                 non_connected_peers = self.subject.get_peers(_query_sql=(sql, peer_ids))
-                self.subject.host.commit()
+                #self.subject.host.commit()
                 for peer_id in non_connected_peers:
                     peer = self.subject.get_peer(peer_id)
-                    self.subject.host.commit()
+                    #self.subject.host.commit()
                     if peer:
                         if debug_sync_connect: print "%s: Connected to peer: %s" % (self.getName(), peer_id)
                         self.subject.sync_add_peer(peer)

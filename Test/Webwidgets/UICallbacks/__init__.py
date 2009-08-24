@@ -65,7 +65,6 @@ class MainWindow(object):
             def update(self):
                 self.clear()
                 self.add_host(self.parent.host)
-                self.parent.host.commit()
 
             def add_node(self, node, **kw):
                 if node.id2s(node.node_id) in (self + "1:Params-Nodes-Field").value: 
