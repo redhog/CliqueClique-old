@@ -37,11 +37,11 @@ class NodeOperations(object):
             cls.id2s(message.get('dst_message_id', None))))
     
     @classmethod
-    def calculate_message_challenge(cls, message):
+    def calculate_message_challenge_id(cls, message):
         return cls._calculate_data_id("challenge/%s" % (cls.id2s(cls.calculate_message_id(message)),))
         
     @classmethod
-    def calculate_message_response(cls, node_id, message):
+    def calculate_message_response_id(cls, node_id, message):
         return cls._calculate_data_id("challenge/%s/%s" % (cls.id2s(node_id),
                                                            cls.id2s(cls.calculate_message_id(message))))
 
@@ -77,10 +77,10 @@ class Node(NodeOperations):
     def get_local_node(self):
         return Tables.Peer.select_obj(self._conn, self.node_id, self.node_id)
 
-    def challenge_message(self, message_challenge):
+    def challenge_message(self, message_challenge_id):
         return Tables.Message.select_obj(
-            self._conn, self.node_id, message_challenge = message_challenge
-            )['message_response']
+            self._conn, self.node_id, message_challenge_id = message_challenge_id
+            )['message_response_id']
 
     def get_message(self, message_id):
         return Tables.Message.select_obj(self._conn, self.node_id, message_id)
@@ -90,13 +90,13 @@ class Node(NodeOperations):
             self._conn,
             Utils.subclass_dict(message,
                                 {'node_id': self.node_id,
-                                 'message_response': self.calculate_message_response(self.node_id, message)}))
+                                 'message_response_id': self.calculate_message_response_id(self.node_id, message)}))
 
     def register_message(self, message, subscription):
         if message['message_id'] != subscription['message_id']:
             raise Exception("Subscription must be for message being registered")
         if (   int(message['message_id']) != self.calculate_message_id(message)
-            or int(message['message_challenge']) != self.calculate_message_challenge(message)):
+            or int(message['message_challenge_id']) != self.calculate_message_challenge_id(message)):
             raise Exception("Message id or challenge does not match message content (bad md5-sum!)")
         self._register_message(message)
         self.update_subscription(subscription)
@@ -139,7 +139,7 @@ class Node(NodeOperations):
                  'peer_id': peer_id,
                  'message_id': update['message_id'],
                  'local_is_subscribed': update['is_subscribed'],
-                 'local_center_node': update['center_node'],
+                 'local_center_node_id': update['center_node_id'],
                  'local_center_distance': update['center_distance']})
         
         local_subscription = Tables.Subscription.select_obj(self._conn, self.node_id, peer_id, update['message_id'])
@@ -150,7 +150,7 @@ class Node(NodeOperations):
         subscription = dict(local_subscription)
         subscription['peer_id'], subscription['node_id'] = subscription['node_id'], subscription['peer_id']
         subscription['remote_is_subscribed'], subscription['local_is_subscribed'] = subscription['local_is_subscribed'], subscription['remote_is_subscribed']
-        subscription['remote_center_node'], subscription['local_center_node'] = subscription['local_center_node'], subscription['remote_center_node']
+        subscription['remote_center_node_id'], subscription['local_center_node_id'] = subscription['local_center_node_id'], subscription['remote_center_node_id']
         subscription['remote_center_distance'], subscription['local_center_distance'] = subscription['local_center_distance'], subscription['remote_center_distance']
 
         if update['delete_subscription']:

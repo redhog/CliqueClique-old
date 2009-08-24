@@ -2,14 +2,39 @@ from __future__ import with_statement
 
 import pydot, CliqueClique.Node
 
-class Visualizer(CliqueClique.Node.NodeOperations):
+class VisualizerOperations(CliqueClique.Node.NodeOperations):
     node_color = "#999999"
     message_color = "#009900"
     message_link_color = "#559955"
     local_subscription_color = "#999999"
     remote_subscription_color = "#990000"
     id_cutoff = 4
+
+    @classmethod
+    def _id2label(cls, obj_id):
+        obj_id = cls.id2s(obj_id)
+        if cls.id_cutoff:
+            obj_id = obj_id[-cls.id_cutoff:]
+        return obj_id
+
+    @classmethod
+    def _ids2labels(cls, obj):
+        # Note: Destructive method!
+        for key in obj.keys():
+            if key.endswith('_id'):
+                obj[key] = cls._id2label(obj[key])
+        return obj
+
+    @classmethod
+    def _ids2s(cls, obj):
+        # Note: Destructive method!
+        for key in obj.keys():
+            if key.endswith('_id'):
+                obj[key + '_l'] = cls._id2label(obj[key])
+                obj[key] = cls.id2s(obj[key])
+        return obj
     
+class Visualizer(VisualizerOperations):
     def __init__(self):
         self.clear()
         
@@ -17,20 +42,6 @@ class Visualizer(CliqueClique.Node.NodeOperations):
         self.clusters = {}
         self.graph = pydot.Dot("neato")
         self.graph.set_overlap("scale")
-
-    def _id2label(self, obj_id):
-        obj_id = self.id2s(obj_id)
-        if self.id_cutoff:
-            obj_id = obj_id[-self.id_cutoff:]
-        return obj_id
-
-    def _ids2s(self, obj):
-        # Note: Destructive method!
-        for key in obj.keys():
-            if key.endswith('_id'):
-                obj[key + '_l'] = self._id2label(obj[key])
-                obj[key] = self.id2s(obj[key])
-        return obj
 
     def add_node(self, node, **kw):
         node_id = node.node_id

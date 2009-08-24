@@ -1,12 +1,15 @@
 from __future__ import with_statement
 
 import datetime, md5, threading, operator, types
-import Utils, Tables, Node
+import Utils, Tables, Node, Visualizer
 import symmetricjsonrpc
 
 debug_sync = True
-debug_sync_event_wait = False
+debug_sync_event_wait = True
+debug_sync_event_wait_details = False
 debug_sync_connect = False
+
+
 reconnect_delay = 10.0
 
 class HostedNode(Node.Node):
@@ -44,7 +47,11 @@ class SyncNode(HostedNode):
 
         subscription, message, delete_subscription = self.get_subscription_update(other.node_id)
         if debug_sync:
-            print "Sync: %s -> %s : %s, %s, delete:%s" % (self.id2s(self.node_id), self.id2s(other.node_id), subscription, message, delete_subscription)
+            print "Sync: %s -> %s : %s, %s, delete:%s" % (Visualizer.VisualizerOperations._id2label(self.node_id),
+                                                          Visualizer.VisualizerOperations._id2label(other.node_id),
+                                                          subscription and Visualizer.VisualizerOperations._ids2labels(subscription),
+                                                          message and Visualizer.VisualizerOperations._ids2labels(message),
+                                                          delete_subscription)
         if subscription:
             if delete_subscription:
                 other.delete_subscription(subscription)
@@ -121,14 +128,12 @@ class ThreadSyncNode(SyncNode):
         super(ThreadSyncNode, self).__init__(*arg, **kw)
 
     def commit(self):
-        print "commit:%s:commit" % threading.currentThread().getName() 
         SyncNode.commit(self)
-        print "commit:%s:sync_signal_event" % threading.currentThread().getName() 
         self.sync_signal_event()
 
     def sync_start(self):
-        self.sync_outbound_thread = self.OutboundSyncThread(self)
-        self.sync_outbound_connection_manager_thread = self.OutboundConnectionManagerThread(self)
+        self.sync_outbound_thread = self.OutboundSyncThread(self, name="%s:outbound" % Visualizer.VisualizerOperations._id2label(self.node_id))
+        self.sync_outbound_connection_manager_thread = self.OutboundConnectionManagerThread(self, name="%s:connmgr" % Visualizer.VisualizerOperations._id2label(self.node_id))
         
     def sync_stop(self):
         self.sync_outbound_thread.shutdown()
@@ -137,20 +142,22 @@ class ThreadSyncNode(SyncNode):
         self.sync_outbound_connection_manager_thread = None
 
     def sync_wait_for_event(self, timeout = None):
-        print "sync_wait_for_event:%s:acquire" % threading.currentThread().getName() 
-        self._sync_new_event.acquire()
-        print "sync_wait_for_event:%s:wait" % threading.currentThread().getName() 
-        self._sync_new_event.wait(timeout)
-        print "sync_wait_for_event:%s:release" % threading.currentThread().getName() 
-        self._sync_new_event.release()
+        if debug_sync_event_wait:
+            name = ['wait', 'aquire'][debug_sync_event_wait_details]
+            print "%s:sync_wait_for_event:%s" % (threading.currentThread().getName(), name)
+        with self._sync_new_event:
+            if debug_sync_event_wait and debug_sync_event_wait_details: print "%s:sync_wait_for_event:wait" % threading.currentThread().getName() 
+            self._sync_new_event.wait(timeout)
+            if debug_sync_event_wait and debug_sync_event_wait_details: print "%s:sync_wait_for_event:release" % threading.currentThread().getName() 
 
     def sync_signal_event(self):
-        print "sync_signal_event:%s:acquire" % threading.currentThread().getName() 
-        self._sync_new_event.acquire()
-        print "sync_signal_event:%s:notifyAll" % threading.currentThread().getName() 
-        self._sync_new_event.notifyAll()
-        print "sync_signal_event:%s:release" % threading.currentThread().getName() 
-        self._sync_new_event.release()
+        if debug_sync_event_wait:
+            name = ['notify', 'aquire'][debug_sync_event_wait_details]
+            print "%s:sync_signal_event:%s" % (threading.currentThread().getName(), name)
+        with self._sync_new_event:
+            if debug_sync_event_wait and debug_sync_event_wait_details: print "%s:sync_signal_event:notify" % threading.currentThread().getName() 
+            self._sync_new_event.notifyAll()
+            if debug_sync_event_wait and debug_sync_event_wait_details: print "%s:sync_signal_event:release" % threading.currentThread().getName() 
 
     def sync_add_peer(self, peer):
         self.sync_peers.append(peer)
@@ -171,17 +178,14 @@ class ThreadSyncNode(SyncNode):
                 else:
                     sql = 'peer_id not in (%s)' % (', '.join('%s' for peer_id in peer_ids),)
                 non_connected_peers = self.subject.get_peers(_query_sql=(sql, peer_ids))
-                #self.subject.host.commit()
                 for peer_id in non_connected_peers:
                     peer = self.subject.get_peer(peer_id)
-                    #self.subject.host.commit()
                     if peer:
                         if debug_sync_connect: print "%s: Connected to peer: %s" % (self.getName(), peer_id)
                         self.subject.sync_add_peer(peer)
                     else:
                         if debug_sync_connect: print "%s: Unable to connect to peer: %s" % (self.getName(), peer_id)
                     if self._shutdown: return                
-                if debug_sync_event_wait: print "%s: Waiting..." % (self.getName(),)
                 self.subject.sync_wait_for_event(reconnect_delay)
 
     class OutboundSyncThread(symmetricjsonrpc.Thread):
@@ -193,16 +197,15 @@ class ThreadSyncNode(SyncNode):
                         syncs += self.subject.sync_peer(peer)
                         self.subject.commit()
                     except:
-                        self.node.rollback()
+                        self.subject.rollback()
                         import traceback
                         traceback.print_exc()
                         self.subject.sync_remove_peer(peer)
                     if self._shutdown: return
-                self.subject.sync_self()
+                syncs += self.subject.sync_self()
                 self.subject.commit()
                 if self._shutdown: return
                 if not syncs:
-                    if debug_sync_event_wait: print "%s: Waiting..." % (self.getName(),)
                     self.subject.sync_wait_for_event()
 
 class IntrospectionNode(Node.Node):
@@ -222,7 +225,7 @@ class IntrospectionNode(Node.Node):
 class UINode(Node.Node):
     def post_message(self, message):
         message['message_id'] = self.calculate_message_id(message)
-        message['message_challenge'] = self.calculate_message_challenge(message)
+        message['message_challenge_id'] = self.calculate_message_challenge_id(message)
         self._register_message(message)
         self.update_local_subscription(message)
         return message
@@ -233,10 +236,10 @@ class UINode(Node.Node):
             subscription = {'peer_id': self.node_id,
                             'message_id': message['message_id'],
                             'local_is_subscribed': 1,
-                            'local_center_node': self.node_id,
+                            'local_center_node_id': self.node_id,
                             'local_center_distance': 1,
                             'remote_is_subscribed': 1,
-                            'remote_center_node': self.node_id,
+                            'remote_center_node_id': self.node_id,
                             'remote_center_distance': 0}
         subscription['remote_is_subscribed'] = subscribed
         self.update_subscription(subscription)
