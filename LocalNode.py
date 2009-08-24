@@ -116,8 +116,8 @@ class ThreadSyncNode(SyncNode):
     def __init__(self, *arg, **kw):
         self._sync_new_event = threading.Condition()
         self.sync_peers = []
-        self.sync_outbound_thread = self.OutboundSyncThread(self)
-        self.sync_outbound_connection_manager_thread = self.OutboundConnectionManagerThread(self)
+        self.sync_outbound_thread  = None
+        self.sync_outbound_connection_manager_thread = None
         super(ThreadSyncNode, self).__init__(*arg, **kw)
 
     def commit(self):
@@ -127,13 +127,14 @@ class ThreadSyncNode(SyncNode):
         self.sync_signal_event()
 
     def sync_start(self):
-        self.sync_outbound_thread.start()
-        self.sync_outbound_connection_manager_thread.start()
+        self.sync_outbound_thread = self.OutboundSyncThread(self)
+        self.sync_outbound_connection_manager_thread = self.OutboundConnectionManagerThread(self)
         
     def sync_stop(self):
         self.sync_outbound_thread.shutdown()
         self.sync_outbound_connection_manager_thread.shutdown()
-        self.sync_signal_event()
+        self.sync_outbound_thread  = None
+        self.sync_outbound_connection_manager_thread = None
 
     def sync_wait_for_event(self, timeout = None):
         print "sync_wait_for_event:%s:acquire" % threading.currentThread().getName() 
