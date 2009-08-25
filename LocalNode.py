@@ -46,13 +46,13 @@ class SyncNode(HostedNode):
             self, other = other, self
 
         subscription, message, delete_subscription = self.get_subscription_update(other.node_id)
-        if debug_sync:
-            print "Sync: %s -> %s : %s, %s, delete:%s" % (Visualizer.VisualizerOperations._id2label(self.node_id),
-                                                          Visualizer.VisualizerOperations._id2label(other.node_id),
-                                                          subscription and Visualizer.VisualizerOperations._ids2labels(subscription),
-                                                          message and Visualizer.VisualizerOperations._ids2labels(message),
-                                                          delete_subscription)
         if subscription:
+            if debug_sync:
+                print "Sync: %s -> %s : %s, %s, delete:%s" % (Visualizer.VisualizerOperations._id2label(self.node_id),
+                                                              Visualizer.VisualizerOperations._id2label(other.node_id),
+                                                              subscription and Visualizer.VisualizerOperations._ids2labels(dict(subscription)),
+                                                              message and Visualizer.VisualizerOperations._ids2labels(dict(message)),
+                                                              delete_subscription)
             if delete_subscription:
                 other.delete_subscription(subscription)
             else:

@@ -322,7 +322,7 @@ class MainWindow(object):
  <th colspan='4'></th>
 </tr>
 %s
-""" % (node_id, '\n'.join(
+""" % (CliqueClique.Visualizer.VisualizerOperations._id2label(node_id), '\n'.join(
 """
 <tr>
  <th></th>
@@ -332,7 +332,7 @@ class MainWindow(object):
  <th colspan='4'></th>
 </tr>
 %s
-""" % (peer_id, '\n'.join(
+""" % (CliqueClique.Visualizer.VisualizerOperations._id2label(peer_id), '\n'.join(
 """
 <tr>
  <td></td>
@@ -342,7 +342,7 @@ class MainWindow(object):
  <td>%(center_distance)s</td>
  <td>%(send_message)s</td>
  <td>%(delete_subscription)s</td>
-""" % subscription_data
+""" % CliqueClique.Visualizer.VisualizerOperations._ids2labels(dict(subscription_data))
                         for subscription_data in peer_data))
                         for (peer_id, peer_data) in node_data.iteritems()))
                         for (node_id, node_data) in res.iteritems()),)
