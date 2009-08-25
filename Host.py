@@ -1,12 +1,13 @@
 from __future__ import with_statement
 
-import contextlib, datetime, md5, os.path, Utils, Tables, Node, LocalNode, Config
+import contextlib, datetime, md5, os.path, Utils, Tables, Node, LocalNode, Config, threading
 
 class Host(object):
     def __init__(self, engine = None):
         self._conn_factory = engine or Config.database_engine
         self._node_cache = {}
         self._conn = self._conn_factory()
+        self.changes = threading.Condition()
 
     def _get_node(self, node_id):
         return LocalNode.LocalNode(self._conn, node_id, self)

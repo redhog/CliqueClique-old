@@ -121,7 +121,6 @@ class SyncNode(HostedNode):
 
 class ThreadSyncNode(SyncNode):
     def __init__(self, *arg, **kw):
-        self._sync_new_event = threading.Condition()
         self.sync_peers = []
         self.sync_outbound_thread  = None
         self.sync_outbound_connection_manager_thread = None
@@ -145,18 +144,18 @@ class ThreadSyncNode(SyncNode):
         if debug_sync_event_wait:
             name = ['wait', 'aquire'][debug_sync_event_wait_details]
             print "%s:sync_wait_for_event:%s" % (threading.currentThread().getName(), name)
-        with self._sync_new_event:
+        with self.host.changes:
             if debug_sync_event_wait and debug_sync_event_wait_details: print "%s:sync_wait_for_event:wait" % threading.currentThread().getName() 
-            self._sync_new_event.wait(timeout)
+            self.host.changes.wait(timeout)
             if debug_sync_event_wait and debug_sync_event_wait_details: print "%s:sync_wait_for_event:release" % threading.currentThread().getName() 
 
     def sync_signal_event(self):
         if debug_sync_event_wait:
             name = ['notify', 'aquire'][debug_sync_event_wait_details]
             print "%s:sync_signal_event:%s" % (threading.currentThread().getName(), name)
-        with self._sync_new_event:
+        with self.host.changes:
             if debug_sync_event_wait and debug_sync_event_wait_details: print "%s:sync_signal_event:notify" % threading.currentThread().getName() 
-            self._sync_new_event.notifyAll()
+            self.host.changes.notifyAll()
             if debug_sync_event_wait and debug_sync_event_wait_details: print "%s:sync_signal_event:release" % threading.currentThread().getName() 
 
     def sync_add_peer(self, peer):
@@ -194,16 +193,18 @@ class ThreadSyncNode(SyncNode):
                 syncs = 0
                 for peer in list(self.subject.sync_peers): # Copy to avoid list changing under our feet...
                     try:
-                        syncs += self.subject.sync_peer(peer)
-                        self.subject.commit()
+                        new_syncs = self.subject.sync_peer(peer)
+                        syncs += new_syncs
+                        if new_syncs: self.subject.commit()
                     except:
                         self.subject.rollback()
                         import traceback
                         traceback.print_exc()
                         self.subject.sync_remove_peer(peer)
                     if self._shutdown: return
-                syncs += self.subject.sync_self()
-                self.subject.commit()
+                new_syncs = self.subject.sync_self()
+                syncs += new_syncs
+                if new_syncs: self.subject.commit()
                 if self._shutdown: return
                 if not syncs:
                     self.subject.sync_wait_for_event()
