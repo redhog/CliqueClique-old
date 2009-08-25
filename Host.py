@@ -2,6 +2,9 @@ from __future__ import with_statement
 
 import contextlib, datetime, md5, os.path, Utils, Tables, Node, LocalNode, Config, threading
 
+debug_change_wait = True
+debug_change_wait_details = False
+
 class Host(object):
     def __init__(self, engine = None):
         self._conn_factory = engine or Config.database_engine
@@ -46,3 +49,21 @@ class Host(object):
         self._conn.close()
         for node in self._node_cache.values():
             node.close()
+
+    def wait_for_change(self, timeout = None):
+        if debug_change_wait:
+            name = ['wait', 'aquire'][debug_change_wait_details]
+            print "%s:wait_for_change:%s" % (threading.currentThread().getName(), name)
+        with self.changes:
+            if debug_change_wait and debug_change_wait_details: print "%s:wait_for_change:wait" % threading.currentThread().getName() 
+            self.changes.wait(timeout)
+            if debug_change_wait and debug_change_wait_details: print "%s:wait_for_change:release" % threading.currentThread().getName() 
+
+    def signal_change(self):
+        if debug_change_wait:
+            name = ['notify', 'aquire'][debug_change_wait_details]
+            print "%s:signal_change:%s" % (threading.currentThread().getName(), name)
+        with self.changes:
+            if debug_change_wait and debug_change_wait_details: print "%s:signal_change:notify" % threading.currentThread().getName() 
+            self.changes.notifyAll()
+            if debug_change_wait and debug_change_wait_details: print "%s:signal_change:release" % threading.currentThread().getName() 

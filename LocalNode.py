@@ -5,11 +5,7 @@ import Utils, Tables, Node, Visualizer
 import symmetricjsonrpc
 
 debug_sync = True
-debug_sync_event_wait = True
-debug_sync_event_wait_details = False
-debug_sync_connect = False
-
-
+debug_sync_connect = True
 reconnect_delay = 10.0
 
 class HostedNode(Node.Node):
@@ -128,7 +124,7 @@ class ThreadSyncNode(SyncNode):
 
     def commit(self):
         SyncNode.commit(self)
-        self.sync_signal_event()
+        self.host.signal_change()
 
     def sync_start(self):
         self.sync_outbound_thread = self.OutboundSyncThread(self, name="%s:outbound" % Visualizer.VisualizerOperations._id2label(self.node_id))
@@ -140,39 +136,20 @@ class ThreadSyncNode(SyncNode):
         self.sync_outbound_thread  = None
         self.sync_outbound_connection_manager_thread = None
 
-    def sync_wait_for_event(self, timeout = None):
-        if debug_sync_event_wait:
-            name = ['wait', 'aquire'][debug_sync_event_wait_details]
-            print "%s:sync_wait_for_event:%s" % (threading.currentThread().getName(), name)
-        with self.host.changes:
-            if debug_sync_event_wait and debug_sync_event_wait_details: print "%s:sync_wait_for_event:wait" % threading.currentThread().getName() 
-            self.host.changes.wait(timeout)
-            if debug_sync_event_wait and debug_sync_event_wait_details: print "%s:sync_wait_for_event:release" % threading.currentThread().getName() 
-
-    def sync_signal_event(self):
-        if debug_sync_event_wait:
-            name = ['notify', 'aquire'][debug_sync_event_wait_details]
-            print "%s:sync_signal_event:%s" % (threading.currentThread().getName(), name)
-        with self.host.changes:
-            if debug_sync_event_wait and debug_sync_event_wait_details: print "%s:sync_signal_event:notify" % threading.currentThread().getName() 
-            self.host.changes.notifyAll()
-            if debug_sync_event_wait and debug_sync_event_wait_details: print "%s:sync_signal_event:release" % threading.currentThread().getName() 
-
     def sync_add_peer(self, peer):
         self.sync_peers.append(peer)
-        self.sync_signal_event()
+        self.host.signal_change()
 
     def sync_remove_peer(self, peer):
         self.sync_peers.remove(peer)
-        self.sync_signal_event()
+        self.host.signal_change()
 
     class OutboundConnectionManagerThread(symmetricjsonrpc.Thread):
         def run_thread(self):
             while not self._shutdown:
-                peer_ids = [peer.node_id for peer in self.subject.sync_peers]
-                if not peer_ids:
-                    sql = 'true'
-                elif len(peer_ids) == 1:
+                # Don't connect to localhost
+                peer_ids = [peer.node_id for peer in self.subject.sync_peers] + [self.subject.node_id]
+                if len(peer_ids) == 1:
                     sql = 'peer_id != %s'
                 else:
                     sql = 'peer_id not in (%s)' % (', '.join('%s' for peer_id in peer_ids),)
@@ -180,12 +157,12 @@ class ThreadSyncNode(SyncNode):
                 for peer_id in non_connected_peers:
                     peer = self.subject.get_peer(peer_id)
                     if peer:
-                        if debug_sync_connect: print "%s: Connected to peer: %s" % (self.getName(), peer_id)
+                        if debug_sync_connect: print "%s:connect:%s:success" % (self.getName(), Visualizer.VisualizerOperations._id2label(peer_id))
                         self.subject.sync_add_peer(peer)
                     else:
-                        if debug_sync_connect: print "%s: Unable to connect to peer: %s" % (self.getName(), peer_id)
+                        if debug_sync_connect: print "%s:connect:%s:failed" % (self.getName(), Visualizer.VisualizerOperations._id2label(peer_id))
                     if self._shutdown: return                
-                self.subject.sync_wait_for_event(reconnect_delay)
+                self.subject.host.wait_for_change(reconnect_delay)
 
     class OutboundSyncThread(symmetricjsonrpc.Thread):
         def run_thread(self):
@@ -207,7 +184,7 @@ class ThreadSyncNode(SyncNode):
                 if new_syncs: self.subject.commit()
                 if self._shutdown: return
                 if not syncs:
-                    self.subject.sync_wait_for_event()
+                    self.subject.host.wait_for_change(reconnect_delay)
 
 class IntrospectionNode(Node.Node):
     def _get_messages(self, **kw):

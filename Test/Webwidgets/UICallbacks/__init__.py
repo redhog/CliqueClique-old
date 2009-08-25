@@ -192,6 +192,12 @@ class MainWindow(object):
                         node.sync_stop()
                     (self + "2:Graph").update()
                     
+            class PokeThreadSync(object):
+                def clicked(self, path):
+                    body = self + "2:"
+                    body.host.signal_change()
+                    (self + "2:Graph").update()
+                    
             class Initialize(object):
                 def clicked(self, path):
                     graph = self + "2:Graph"
