@@ -30,10 +30,12 @@ create table subscription (
  peer_id numeric,
 
  local_is_subscribed integer, -- not bool, to be able to do max(); 1 is true, 0 false, null is deleted
+ local_center_node_is_subscribed integer, -- not bool, to be able to do max(); 1 is true, 0 false, null is deleted
  local_center_node_id numeric,
  local_center_distance integer,
 
  remote_is_subscribed integer, -- not bool, to be able to do max(); 1 is true, 0 false, null is deleted
+ remote_center_node_is_subscribed integer, -- not bool, to be able to do max(); 1 is true, 0 false, null is deleted
  remote_center_node_id numeric,
  remote_center_distance integer,
 

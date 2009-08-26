@@ -68,7 +68,7 @@ class Visualizer(VisualizerOperations):
         self._ids2s(data)
         self.clusters[self.id2s(node.node_id)].add_node(
             pydot.Node('"%(node_id)s/%(message_id)s"' % data,
-                       label='"%(message_id_l)s: %(is_subscribed)s[%(center_distance)s->%(center_node_id_l)s]\\n%(content)s"' % data,
+                       label='"%(message_id_l)s: %(is_subscribed)s/%(center_distance)s->%(center_node_is_subscribed)s/%(center_node_id_l)s\\n%(content)s"' % data,
                        color=self.message_color,
                        **kw))
 
@@ -89,7 +89,7 @@ class Visualizer(VisualizerOperations):
         self.graph.add_edge(
             pydot.Edge('"%(node_id)s/%(message_id)s"' % data,
                        '"%(peer_id)s/%(message_id)s"' % data,
-                       label='"L:%(local_is_subscribed)s[%(local_center_distance)s->%(local_center_node_id_l)s] R:%(remote_is_subscribed)s[%(remote_center_distance)s->%(remote_center_node_id_l)s]"' % data,
+                       label='"L:%(local_is_subscribed)s/%(local_center_distance)s->%(local_center_node_is_subscribed)s/%(local_center_node_id_l)s R:%(remote_is_subscribed)s/%(remote_center_distance)s->%(remote_center_node_is_subscribed)s/%(remote_center_node_id_l)s"' % data,
                        color=self.remote_subscription_color,
                        **kw))
         

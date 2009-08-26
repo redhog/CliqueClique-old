@@ -214,12 +214,15 @@ class UINode(Node.Node):
             subscription = {'peer_id': self.node_id,
                             'message_id': message['message_id'],
                             'local_is_subscribed': 1,
+                            'local_center_node_is_subscribed': 1,
                             'local_center_node_id': self.node_id,
                             'local_center_distance': 1,
                             'remote_is_subscribed': 1,
+                            'remote_center_node_is_subscribed': 1,
                             'remote_center_node_id': self.node_id,
                             'remote_center_distance': 0}
         subscription['remote_is_subscribed'] = subscribed
+        subscription['remote_center_node_is_subscribed'] = subscribed
         self.update_subscription(subscription)
 
     def delete_local_subscription(self, message):

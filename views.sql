@@ -37,10 +37,12 @@ create view upstream_subscription as
   peer_id as peer_id,
 
   local_is_subscribed as local_is_subscribed,
+  local_center_node_is_subscribed as local_center_node_is_subscribed,
   local_center_node_id as local_center_node_id,
   local_center_distance as local_center_distance,
 
   remote_is_subscribed as remote_is_subscribed,
+  remote_center_node_is_subscribed as remote_center_node_is_subscribed,
   remote_center_node_id as remote_center_node_id,
   remote_center_distance as remote_center_distance
  from
@@ -48,7 +50,8 @@ create view upstream_subscription as
  where
       local_is_subscribed is not null -- if the subscription is deleted
   and remote_is_subscribed is not null
-  and (   local_center_node_id > remote_center_node_id
+  and (   local_center_node_is_subscribed > remote_center_node_is_subscribed
+       or local_center_node_id > remote_center_node_id
        or local_center_distance > remote_center_distance
        or local_center_distance is null -- if the subscription is new
        or remote_center_distance is null);
@@ -60,10 +63,12 @@ create view downstream_subscription as
   subscription.peer_id as peer_id,
 
   subscription.local_is_subscribed as local_is_subscribed,
+  subscription.local_center_node_is_subscribed as local_center_node_is_subscribed,
   subscription.local_center_node_id as local_center_node_id,
   subscription.local_center_distance as local_center_distance,
 
   subscription.remote_is_subscribed as remote_is_subscribed,
+  subscription.remote_center_node_is_subscribed as remote_center_node_is_subscribed,
   subscription.remote_center_node_id as remote_center_node_id,
   subscription.remote_center_distance as remote_center_distance
  from
@@ -73,6 +78,7 @@ create view downstream_subscription as
    and subscription.peer_id = peer.peer_id 
  where
      peer.do_mirror != 0
+  or subscription.local_center_node_is_subscribed <= subscription.remote_center_node_is_subscribed
   or subscription.local_center_node_id <= subscription.remote_center_node_id
   or subscription.local_center_distance <= subscription.remote_center_distance
   or subscription.local_center_distance is null
@@ -83,8 +89,9 @@ create view local_subscription as
   node_id as node_id,
   message_id as message_id,
   is_subscribed as is_subscribed,
-  min_center[1] as center_node_id,
-  min_center[2] + 1 as center_distance
+  min_center[1] as center_node_is_subscribed,
+  min_center[2] as center_node_id,
+  min_center[3] + 1 as center_distance
  from
   (select
     upstream.node_id as node_id,
@@ -95,7 +102,7 @@ create view local_subscription as
       else downstream.remote_is_subscribed
       end),
      0) as is_subscribed,
-    min(array[upstream.remote_center_node_id, upstream.remote_center_distance]) as min_center
+    min(array[upstream.remote_center_node_is_subscribed, upstream.remote_center_node_id, upstream.remote_center_distance]) as min_center
    from
     upstream_subscription as upstream
 
@@ -114,6 +121,7 @@ create view recursive_local_subscription as
   message_link.dst_message_id as message_id,
  
   0 as is_subscribed,
+  null as center_node_is_subscribed,
   null as center_node_id,
   null as center_distance
  from
@@ -128,6 +136,7 @@ create view full_recursive_local_subscription as
   node_id,
   message_id,
   max(is_subscribed) as is_subscribed,
+  min(center_node_is_subscribed) as center_node_is_subscribed,
   min(center_distance) as center_distance,
   min(center_node_id) as center_node_id -- could have done the min(array[]) thing here, but we're only ever gonna have two values, a value and null so it doesn't matter just here
  from
@@ -144,10 +153,12 @@ create view recursive_subscription as
   src_subscription.peer_id as peer_id,
 
   dst_subscription.local_is_subscribed as local_is_subscribed,
+  dst_subscription.local_center_node_is_subscribed as local_center_node_is_subscribed,
   dst_subscription.local_center_node_id as local_center_node_id,
   dst_subscription.local_center_distance as local_center_distance,
 
   dst_subscription.remote_is_subscribed as remote_is_subscribed,
+  dst_subscription.remote_center_node_is_subscribed as remote_center_node_is_subscribed,
   dst_subscription.remote_center_node_id as remote_center_node_id,
   dst_subscription.remote_center_distance as remote_center_distance
  from
@@ -174,6 +185,7 @@ create view subscription_changes as
   full_recursive_subscription.peer_id as peer_id,
 
   full_recursive_local_subscription.is_subscribed as is_subscribed,
+  full_recursive_local_subscription.center_node_is_subscribed as center_node_is_subscribed,
   full_recursive_local_subscription.center_node_id as center_node_id,
   full_recursive_local_subscription.center_distance as center_distance,
 
@@ -217,6 +229,7 @@ create view subscription_updates as
    message_id as message_id,
    peer_id as peer_id,
    is_subscribed as is_subscribed,
+   center_node_is_subscribed as center_node_is_subscribed,
    center_node_id as center_node_id,
    center_distance as center_distance,
    send_message as send_message,
@@ -228,6 +241,7 @@ create view subscription_updates as
    message_id as message_id,
    peer_id as peer_id,
    null::integer as is_subscribed,
+   null::integer  as center_node_is_subscribed,
    null::numeric as center_node_id,
    null::integer as center_distance,
    false as send_message,
