@@ -110,16 +110,16 @@ class SyncNode(HostedNode):
 
             local = object.__getattribute__(self, "_local_peer")
             member = getattr(local, name)
-            if not isinstance(member, types.MethodType):
+            if not isinstance(sync_outbound_connection_manager_threadmember, types.MethodType):
                 return member
             return wrap(local, member)
 
 
 class ThreadSyncNode(SyncNode):
     def __init__(self, *arg, **kw):
-        self.sync_peers = []
-        self.sync_outbound_thread  = None
-        self.sync_outbound_connection_manager_thread = None
+        self._sync_connected_peers = []
+        self._sync_outbound_thread  = None
+        self._sync_outbound_connection_manager_thread = None
         super(ThreadSyncNode, self).__init__(*arg, **kw)
 
     def commit(self):
@@ -127,28 +127,28 @@ class ThreadSyncNode(SyncNode):
         self.host.signal_change()
 
     def sync_start(self):
-        self.sync_outbound_thread = self.OutboundSyncThread(self, name="%s:outbound" % Visualizer.VisualizerOperations._id2label(self.node_id))
-        self.sync_outbound_connection_manager_thread = self.OutboundConnectionManagerThread(self, name="%s:connmgr" % Visualizer.VisualizerOperations._id2label(self.node_id))
+        self._sync_outbound_thread = self.OutboundSyncThread(self, name="%s:outbound" % Visualizer.VisualizerOperations._id2label(self.node_id))
+        self._sync_outbound_connection_manager_thread = self.OutboundConnectionManagerThread(self, name="%s:connmgr" % Visualizer.VisualizerOperations._id2label(self.node_id))
         
     def sync_stop(self):
-        self.sync_outbound_thread.shutdown()
-        self.sync_outbound_connection_manager_thread.shutdown()
-        self.sync_outbound_thread  = None
-        self.sync_outbound_connection_manager_thread = None
+        self._sync_outbound_thread.shutdown()
+        self._sync_outbound_connection_manager_thread.shutdown()
+        self._sync_outbound_thread  = None
+        self._sync_outbound_connection_manager_thread = None
 
     def sync_add_peer(self, peer):
-        self.sync_peers.append(peer)
+        self._sync_connected_peers.append(peer)
         self.host.signal_change()
 
     def sync_remove_peer(self, peer):
-        self.sync_peers.remove(peer)
+        self._sync_connected_peers.remove(peer)
         self.host.signal_change()
 
     class OutboundConnectionManagerThread(symmetricjsonrpc.Thread):
         def run_thread(self):
             while not self._shutdown:
                 # Don't connect to localhost
-                peer_ids = [peer.node_id for peer in self.subject.sync_peers] + [self.subject.node_id]
+                peer_ids = [peer.node_id for peer in self.subject._sync_connected_peers] + [self.subject.node_id]
                 if len(peer_ids) == 1:
                     sql = 'peer_id != %s'
                 else:
@@ -168,7 +168,7 @@ class ThreadSyncNode(SyncNode):
         def run_thread(self):
             while not self._shutdown:
                 syncs = 0
-                for peer in list(self.subject.sync_peers): # Copy to avoid list changing under our feet...
+                for peer in list(self.subject._sync_connected_peers): # Copy to avoid list changing under our feet...
                     try:
                         new_syncs = self.subject.sync_peer(peer)
                         syncs += new_syncs
