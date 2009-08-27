@@ -50,7 +50,7 @@ create view upstream_subscription as
  where
       local_is_subscribed is not null -- if the subscription is deleted
   and remote_is_subscribed is not null
-  and (   local_center_node_is_subscribed > remote_center_node_is_subscribed
+  and (   local_center_node_is_subscribed <= remote_center_node_is_subscribed
        or local_center_node_id > remote_center_node_id
        or local_center_distance > remote_center_distance
        or local_center_distance is null -- if the subscription is new
@@ -78,7 +78,7 @@ create view downstream_subscription as
    and subscription.peer_id = peer.peer_id 
  where
      peer.do_mirror != 0
-  or subscription.local_center_node_is_subscribed <= subscription.remote_center_node_is_subscribed
+  or subscription.local_center_node_is_subscribed > subscription.remote_center_node_is_subscribed
   or subscription.local_center_node_id <= subscription.remote_center_node_id
   or subscription.local_center_distance <= subscription.remote_center_distance
   or subscription.local_center_distance is null
@@ -89,7 +89,7 @@ create view local_subscription as
   node_id as node_id,
   message_id as message_id,
   is_subscribed as is_subscribed,
-  min_center[1] as center_node_is_subscribed,
+  -min_center[1] as center_node_is_subscribed,
   min_center[2] as center_node_id,
   min_center[3] + 1 as center_distance
  from
@@ -102,7 +102,7 @@ create view local_subscription as
       else downstream.remote_is_subscribed
       end),
      0) as is_subscribed,
-    min(array[upstream.remote_center_node_is_subscribed, upstream.remote_center_node_id, upstream.remote_center_distance]) as min_center
+    min(array[-upstream.remote_center_node_is_subscribed, upstream.remote_center_node_id, upstream.remote_center_distance]) as min_center
    from
     upstream_subscription as upstream
 
@@ -136,7 +136,7 @@ create view full_recursive_local_subscription as
   node_id,
   message_id,
   max(is_subscribed) as is_subscribed,
-  min(center_node_is_subscribed) as center_node_is_subscribed,
+  max(center_node_is_subscribed) as center_node_is_subscribed,
   min(center_distance) as center_distance,
   min(center_node_id) as center_node_id -- could have done the min(array[]) thing here, but we're only ever gonna have two values, a value and null so it doesn't matter just here
  from
