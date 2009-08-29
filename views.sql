@@ -197,9 +197,15 @@ create view subscription_changes as
        full_recursive_local_subscription.node_id = full_recursive_subscription.node_id
    and full_recursive_local_subscription.message_id = full_recursive_subscription.message_id
    and (   full_recursive_local_subscription.is_subscribed != full_recursive_subscription.local_is_subscribed
+        or full_recursive_local_subscription.center_node_is_subscribed != full_recursive_subscription.local_center_node_is_subscribed
+        or full_recursive_local_subscription.center_node_id != full_recursive_subscription.local_center_node_id
         or full_recursive_local_subscription.center_distance != full_recursive_subscription.local_center_distance
         or full_recursive_local_subscription.is_subscribed is null
         or full_recursive_subscription.local_is_subscribed is null
+        or full_recursive_local_subscription.center_node_is_subscribed is null
+        or full_recursive_subscription.local_center_node_is_subscribed is null
+        or full_recursive_local_subscription.center_node_id is null
+        or full_recursive_subscription.local_center_node_id is null
         or full_recursive_local_subscription.center_distance is null
         or full_recursive_subscription.local_center_distance is null);
 

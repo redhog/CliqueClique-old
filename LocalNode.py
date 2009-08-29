@@ -110,7 +110,7 @@ class SyncNode(HostedNode):
 
             local = object.__getattribute__(self, "_local_peer")
             member = getattr(local, name)
-            if not isinstance(sync_outbound_connection_manager_threadmember, types.MethodType):
+            if not isinstance(member, types.MethodType):
                 return member
             return wrap(local, member)
 

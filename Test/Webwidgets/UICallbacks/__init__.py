@@ -221,14 +221,18 @@ class MainWindow(object):
                 def clicked(self, path):
                     graph = self + "2:Graph"
                     (self+"2:").host.initialize()
-                    poster_node = graph.get_node(node_num_to_id(0))
-                    msg1 = poster_node.post_text_message('Message')
-                    msg2 = poster_node.post_text_message('Comment')
-                    msglnk1 = poster_node.post_link_message('Link', msg1, msg2)
-                    other_node = graph.get_node(node_num_to_id(1))
-                    other_node.import_message_from_peer(poster_node, msg1['message_id'])
-                    poster_node.commit()
-                    other_node.commit()
+                    nodes = [graph.get_node(node_num_to_id(x)) for x in xrange(0, 3)]
+
+                    msg1 = nodes[0].post_text_message('Message')
+                    msg2 = nodes[0].post_text_message('Comment')
+                    msglnk1 = nodes[0].post_link_message('Link', msg1, msg2)
+                    
+                    nodes[1].import_message_from_peer(nodes[0], msg1['message_id'])
+                    nodes[2].import_message_from_peer(nodes[1], msg1['message_id'])
+
+                    for node in nodes:
+                        node.commit()
+
                     (self + "2:Graph").update()
 
             class PostMessage(object):
