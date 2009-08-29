@@ -83,10 +83,10 @@
    <table>
     <tr>
      <td>
-      <w:Widget id="SubscriptionUpdates" />
+      <w:Hide id="SubscriptionUpdates" title="Subscription updates" Child=":Widget" />
      </td>
      <td>
-      <!-- w:Widget id="Subscriptions" / -->
+      <w:Hide id="Subscriptions" title="Subscriptions" Child=":Widget" />
      </td>
     </tr>
    </table>

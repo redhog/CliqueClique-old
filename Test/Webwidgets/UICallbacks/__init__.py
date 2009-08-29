@@ -298,22 +298,23 @@ class MainWindow(object):
                     pass
 
         class SubscriptionUpdates(object):
-            def draw(self, output_options):
-                graph = self + "1:Graph"
+            class Child(object):
+                def draw(self, output_options):
+                    graph = self + "2:Graph"
 
-                res = {}
-                node_ids = (self + "1:Params-Nodes-Field").value.strip()
-                node_ids = node_ids and set(graph.s2id(node_id) for node_id in node_ids.split(' ')) or set()
+                    res = {}
+                    node_ids = (self + "2:Params-Nodes-Field").value.strip()
+                    node_ids = node_ids and set(graph.s2id(node_id) for node_id in node_ids.split(' ')) or set()
 
-                for node_id in node_ids:
-                    node = graph.get_node(graph.id2s(node_id))
-                    res[node_id] = {}
-                    for peer_id in node_ids:
-                        with CliqueClique.Tables.SubscriptionUpdates.select_objs(
-                            node._conn, node.node_id, peer_id) as subscriptions:
-                            res[node_id][peer_id] = list(subscriptions)
+                    for node_id in node_ids:
+                        node = graph.get_node(graph.id2s(node_id))
+                        res[node_id] = {}
+                        for peer_id in node_ids:
+                            with CliqueClique.Tables.SubscriptionUpdates.select_objs(
+                                node._conn, node.node_id, peer_id) as subscriptions:
+                                res[node_id][peer_id] = list(subscriptions)
 
-                return """
+                    return """
 <table>
  <tr>
   <th>node</th>
@@ -364,25 +365,26 @@ class MainWindow(object):
 
 
         class Subscriptions(object):
-            def draw(self, output_options):
-                graph = self + "1:Graph"
-                host = (self + "1:").host
+            class Child(object):
+                def draw(self, output_options):
+                    graph = self + "2:Graph"
+                    host = (self + "2:").host
 
-                res = {}
-                node_ids = (self + "1:Params-Nodes-Field").value.strip()
-                node_ids = node_ids and set(graph.s2id(node_id) for node_id in node_ids.split(' ')) or set()
+                    res = {}
+                    node_ids = (self + "2:Params-Nodes-Field").value.strip()
+                    node_ids = node_ids and set(graph.s2id(node_id) for node_id in node_ids.split(' ')) or set()
 
-                with CliqueClique.Tables.UpstreamSubscription.select_objs(
-                    host._conn, node_ids) as upstreams:
-                    for upstream in upstreams:
-                        add_to_tree(res, [upstream['node_id'], upstream['message_id'], 'up', upstream['peer_id']], upstream)
+                    with CliqueClique.Tables.UpstreamSubscription.select_objs(
+                        host._conn, node_ids) as upstreams:
+                        for upstream in upstreams:
+                            add_to_tree(res, [upstream['node_id'], upstream['message_id'], 'up', upstream['peer_id']], upstream)
 
-                with CliqueClique.Tables.DownstreamSubscription.select_objs(
-                    host._conn, node_ids) as downstreams:
-                    for downstream in downstreams:
-                        add_to_tree(res, [downstream['node_id'], downstream['message_id'], 'down', downstream['peer_id']], downstream)
+                    with CliqueClique.Tables.DownstreamSubscription.select_objs(
+                        host._conn, node_ids) as downstreams:
+                        for downstream in downstreams:
+                            add_to_tree(res, [downstream['node_id'], downstream['message_id'], 'down', downstream['peer_id']], downstream)
 
-                return """
+                    return """
 <table>
  <tr>
   <th>node</th>

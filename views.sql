@@ -50,7 +50,7 @@ create view upstream_subscription as
  where
       local_is_subscribed is not null -- if the subscription is deleted
   and remote_is_subscribed is not null
-  and (   local_center_node_is_subscribed <= remote_center_node_is_subscribed
+  and (   local_center_node_is_subscribed < remote_center_node_is_subscribed
        or local_center_node_id > remote_center_node_id
        or local_center_distance > remote_center_distance
        or local_center_distance is null -- if the subscription is new
@@ -79,8 +79,8 @@ create view downstream_subscription as
  where
      peer.do_mirror != 0
   or subscription.local_center_node_is_subscribed > subscription.remote_center_node_is_subscribed
-  or subscription.local_center_node_id <= subscription.remote_center_node_id
-  or subscription.local_center_distance <= subscription.remote_center_distance
+  or subscription.local_center_node_id < subscription.remote_center_node_id
+  or subscription.local_center_distance < subscription.remote_center_distance
   or subscription.local_center_distance is null
   or subscription.remote_center_distance is null;
 
