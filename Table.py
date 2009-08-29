@@ -63,8 +63,22 @@ class Table(object):
         if not kw:
             return extra_sql, extra_params
         query_keys = kw.keys()
-        query_sql = ' and '.join("%s = %s" % (query_key, cls._paramstyle_from_conn(conn)) for query_key in query_keys)
-        query_params = [kw[query_key] for query_key in query_keys]
+        query_sql_parts = []
+        for query_key in query_keys:
+            if isinstance(kw[query_key], (list, tuple, set)) and len(kw[query_key]) != 1:
+                if not kw[query_key]:
+                    query_sql_parts.append("false")
+                else:
+                    query_sql_parts.append("%s in (%s)" % (query_key, ", ".join(cls._paramstyle_from_conn(conn) for x in  kw[query_key])))
+            else:
+                query_sql_parts.append("%s = %s" % (query_key, cls._paramstyle_from_conn(conn)))
+        query_sql = ' and '.join(query_sql_parts)
+        query_params = []
+        for query_key in query_keys:
+            if isinstance(kw[query_key], (list, tuple, set)):
+                query_params.extend(kw[query_key])
+            else:
+                query_params.append(kw[query_key])
         return extra_sql + " and " + query_sql, extra_params + query_params
 
     @classmethod

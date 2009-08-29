@@ -30,6 +30,13 @@ def node_num_to_id(node_num):
 
 debug_graphviz = False
 
+def add_to_tree(tree, path, value):
+    for item in path[:-1]:
+        if item not in tree:
+            tree[item] = {}
+        tree = tree[item]
+    tree[path[-1]] = value
+
 class MainWindow(object):
     class Body(object):
         def __init__(self, *arg, **kw):
@@ -312,10 +319,11 @@ class MainWindow(object):
   <th>node</th>
   <th>peer</th>
   <th>message</th>
-  <th>is_subscribed</th>
-  <th>center_distance</th>
-  <th>send_message</th>
-  <th>delete_subscription</th>
+  <th>is subscribed</th>
+  <th>center node is subscribed</th>
+  <th>center distance</th>
+  <th>send message</th>
+  <th>delete subscription</th>
  </tr>
  %s
 </table>
@@ -325,7 +333,7 @@ class MainWindow(object):
  <th colspan='3'>
   %s
  </th>
- <th colspan='4'></th>
+ <th colspan='5'></th>
 </tr>
 %s
 """ % (CliqueClique.Visualizer.VisualizerOperations._id2label(node_id), '\n'.join(
@@ -335,7 +343,7 @@ class MainWindow(object):
  <th colspan='2'>
   %s
  </th>
- <th colspan='4'></th>
+ <th colspan='5'></th>
 </tr>
 %s
 """ % (CliqueClique.Visualizer.VisualizerOperations._id2label(peer_id), '\n'.join(
@@ -345,6 +353,7 @@ class MainWindow(object):
  <td></td>
  <td>%(message_id)s</td>
  <td>%(is_subscribed)s</td>
+ <td>%(center_node_is_subscribed)s</td>
  <td>%(center_distance)s</td>
  <td>%(send_message)s</td>
  <td>%(delete_subscription)s</td>
@@ -352,3 +361,94 @@ class MainWindow(object):
                         for subscription_data in peer_data))
                         for (peer_id, peer_data) in node_data.iteritems()))
                         for (node_id, node_data) in res.iteritems()),)
+
+
+        class Subscriptions(object):
+            def draw(self, output_options):
+                graph = self + "1:Graph"
+                host = (self + "1:").host
+
+                res = {}
+                node_ids = (self + "1:Params-Nodes-Field").value.strip()
+                node_ids = node_ids and set(graph.s2id(node_id) for node_id in node_ids.split(' ')) or set()
+
+                with CliqueClique.Tables.UpstreamSubscription.select_objs(
+                    host._conn, node_ids) as upstreams:
+                    for upstream in upstreams:
+                        add_to_tree(res, [upstream['node_id'], upstream['message_id'], 'up', upstream['peer_id']], upstream)
+
+                with CliqueClique.Tables.DownstreamSubscription.select_objs(
+                    host._conn, node_ids) as downstreams:
+                    for downstream in downstreams:
+                        add_to_tree(res, [downstream['node_id'], downstream['message_id'], 'down', downstream['peer_id']], downstream)
+
+                return """
+<table>
+ <tr>
+  <th>node</th>
+  <th>message</th>
+  <th>direction</th>
+  <th>peer</th>
+  <th>local is subscribed</th>
+  <th>local center node is subscribed</th>
+  <th>local center node id</th>
+  <th>local center distance</th>
+  <th>remote is subscribed</th>
+  <th>remote center node is subscribed</th>
+  <th>remote center node id</th>
+  <th>remote center distance</th>
+ </tr>
+ %s
+</table>
+                        """ % ('\n'.join(
+"""
+<tr>
+ <th colspan='4'>
+  %s
+ </th>
+ <th colspan='8'></th>
+</tr>
+%s
+""" % (CliqueClique.Visualizer.VisualizerOperations._id2label(node_id), '\n'.join(
+"""
+<tr>
+ <th></th>
+ <th colspan='3'>
+  %s
+ </th>
+ <th colspan='8'></th>
+</tr>
+%s
+""" % (CliqueClique.Visualizer.VisualizerOperations._id2label(message_id), '\n'.join(
+"""
+<tr>
+ <th></th>
+ <th></th>
+ <th colspan='2'>
+  %s
+ </th>
+ <th colspan='8'></th>
+</tr>
+%s
+""" % (direction, '\n'.join(
+"""
+<tr>
+ <td></td>
+ <td></td>
+ <td></td>
+ <td>%(peer_id)s</td>
+ <td>%(local_is_subscribed)s</td>
+ <td>%(local_center_node_is_subscribed)s</td>
+ <td>%(local_center_node_id)s</td>
+ <td>%(local_center_distance)s</td>
+ <td>%(remote_is_subscribed)s</td>
+ <td>%(remote_center_node_is_subscribed)s</td>
+ <td>%(remote_center_node_id)s</td>
+ <td>%(remote_center_distance)s</td>
+""" % CliqueClique.Visualizer.VisualizerOperations._ids2labels(dict(subscription_data))
+                        for (peer_id, subscription_data) in direction_data.iteritems()))
+                        for (direction, direction_data) in message_data.iteritems()))
+                        for (message_id, message_data) in node_data.iteritems()))
+                        for (node_id, node_data) in res.iteritems()),)
+
+                

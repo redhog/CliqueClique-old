@@ -80,7 +80,16 @@
     </w:Field>
    </w:Fieldgroup>
 
-   <w:Widget id="SubscriptionUpdates" />
+   <table>
+    <tr>
+     <td>
+      <w:Widget id="SubscriptionUpdates" />
+     </td>
+     <td>
+      <!-- w:Widget id="Subscriptions" / -->
+     </td>
+    </tr>
+   </table>
 
   </w:Html>
  </w:HtmlWindow>

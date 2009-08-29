@@ -139,6 +139,7 @@ class Node(NodeOperations):
                  'peer_id': peer_id,
                  'message_id': update['message_id'],
                  'local_is_subscribed': update['is_subscribed'],
+                 'local_center_node_is_subscribed': update['center_node_is_subscribed'],
                  'local_center_node_id': update['center_node_id'],
                  'local_center_distance': update['center_distance']})
         
@@ -148,10 +149,15 @@ class Node(NodeOperations):
             message = Tables.Message.select_obj(self._conn, self.node_id, update['message_id'])
 
         subscription = dict(local_subscription)
-        subscription['peer_id'], subscription['node_id'] = subscription['node_id'], subscription['peer_id']
-        subscription['remote_is_subscribed'], subscription['local_is_subscribed'] = subscription['local_is_subscribed'], subscription['remote_is_subscribed']
-        subscription['remote_center_node_id'], subscription['local_center_node_id'] = subscription['local_center_node_id'], subscription['remote_center_node_id']
-        subscription['remote_center_distance'], subscription['local_center_distance'] = subscription['local_center_distance'], subscription['remote_center_distance']
+
+        def swap_ids(d, id1, id2):
+            d[id1], d[id2] = d[id2], d[id1]
+        
+        swap_ids(subscription, 'peer_id', 'node_id')
+        swap_ids(subscription, 'remote_is_subscribed', 'local_is_subscribed')
+        swap_ids(subscription, 'remote_center_node_is_subscribed', 'local_center_node_is_subscribed')
+        swap_ids(subscription, 'remote_center_node_id', 'local_center_node_id')
+        swap_ids(subscription, 'remote_center_distance', 'local_center_distance')
 
         if update['delete_subscription']:
             self.delete_subscription(local_subscription)
