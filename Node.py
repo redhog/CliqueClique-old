@@ -48,16 +48,18 @@ class NodeOperations(object):
 class Node(NodeOperations):
     node_id = None
     
-    def __init__(self, conn, node_id):
+    def __init__(self, conn, node_id, **kw):
         self._conn = conn
         self.node_id = node_id
         if self.get_local_node() is None:
-            self._initialize()
+            self._initialize(**kw)
             self.commit()
 
-    def _initialize(self):
-        self._register_peer({'peer_id': self.node_id,
-                             'do_mirror': 1})
+    def _initialize(self, **kw):
+        self._register_peer(
+            Utils.subclass_dict(kw,
+                                {'peer_id': self.node_id,
+                                 'do_mirror': 1}))
 
     def _register_peer(self, peer):
         Tables.Peer.create_or_update(

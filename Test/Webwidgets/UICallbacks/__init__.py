@@ -57,8 +57,8 @@ class MainWindow(object):
                         print self.graph.create(format = 'dot')
                         print "=========================================="
 
-            def get_node(self, node_id):
-                return self.parent.host.get_node(self.s2id(node_id), True)
+            def get_node(self, node_id, **kw):
+                return self.parent.host.get_node(self.s2id(node_id), cache=True, **kw)
 
             def get_node_message(self, message):
                 node_id, message_id = message.split(':')
@@ -209,9 +209,9 @@ class MainWindow(object):
                 def clicked(self, path):
                     graph = self + "2:Graph"
                     (self+"2:").host.initialize()
-                    poster_node = graph.get_node(node_num_to_id(0))
+                    poster_node = graph.get_node(node_num_to_id(0), last_seen_address="tcp:localhost:4710")
                     msg = poster_node.post_text_message('Root message')
-                    other_node = graph.get_node(node_num_to_id(1))
+                    other_node = graph.get_node(node_num_to_id(1), last_seen_address="tcp:localhost:4711")
                     other_node.import_message_from_peer(poster_node, msg['message_id'])
                     poster_node.commit()
                     other_node.commit()
@@ -221,7 +221,7 @@ class MainWindow(object):
                 def clicked(self, path):
                     graph = self + "2:Graph"
                     (self+"2:").host.initialize()
-                    nodes = [graph.get_node(node_num_to_id(x)) for x in xrange(0, 3)]
+                    nodes = [graph.get_node(node_num_to_id(x), last_seen_address="tcp:localhost:471%s" % x) for x in xrange(0, 3)]
 
                     msg1 = nodes[0].post_text_message('Message')
                     msg2 = nodes[0].post_text_message('Comment')

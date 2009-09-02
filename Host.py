@@ -12,14 +12,14 @@ class Host(object):
         self._conn = self._conn_factory()
         self.changes = threading.Condition()
 
-    def _get_node(self, node_id):
-        return LocalNode.LocalNode(self._conn, node_id, self)
+    def _get_node(self, node_id, **kw):
+        return LocalNode.LocalNode(self._conn, node_id, self, **kw)
 
-    def get_node(self, node_id, cache = False):
+    def get_node(self, node_id, cache = False, **kw):
         if not cache:
-            return self._get_node(node_id)
+            return self._get_node(node_id, **kw)
         if node_id not in self._node_cache:
-            self._node_cache[node_id] = self._get_node(node_id)
+            self._node_cache[node_id] = self._get_node(node_id, **kw)
         return self._node_cache[node_id]
             
     def get_nodes(self):

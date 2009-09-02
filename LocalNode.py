@@ -1,17 +1,18 @@
 from __future__ import with_statement
 
-import datetime, md5, threading, operator, types
+import datetime, md5, threading, operator, types, socket
 import Utils, Tables, Node, Visualizer
 import symmetricjsonrpc
+import traceback
 
 debug_sync = True
 debug_sync_connect = True
 reconnect_delay = 10.0
 
 class HostedNode(Node.Node):
-    def __init__(self, _conn, node_id, host):
+    def __init__(self, _conn, node_id, host, **kw):
         self.host = host
-        Node.Node.__init__(self, _conn, node_id)
+        Node.Node.__init__(self, _conn, node_id, **kw)
 
 class SyncNode(HostedNode):
     def commit(self):
@@ -79,47 +80,11 @@ class SyncNode(HostedNode):
 
     def get_peers(self, *arg, **kw):
         with Tables.Peer.select_objs(self._conn, self.node_id, *arg, **kw) as objs:
-            return [obj['peer_id']
-                    for obj in objs]
-
-    def get_peer(self, peer_id):
-        # Add XMLL-RPC connect interface here...
-        return self.LocalPeerConnector(self.host.get_node(peer_id))
-
-    class LocalPeerConnector(object):
-        """Wrapper for Node that hides all methods that shouldn't be
-        allowed to be accessed from remote hosts."""
-        
-        def __init__(self, local_peer):
-            self._local_peer = local_peer
-            
-        def __getattribute__(self, name):
-            if not hasattr(Node.Node, name):
-                raise AttributeError("You can not use methods meant for the local node on peers, even when connected to them locally.", name)
-
-            def wrap(local, member):
-                def wrapper(*arg, **kw):
-                    try:
-                        return member(*arg, **kw)
-                    except:
-                        local.rollback()
-                        raise
-                    else:
-                        local.commit()
-                return wrapper
-
-            local = object.__getattribute__(self, "_local_peer")
-            member = getattr(local, name)
-            if not isinstance(member, types.MethodType):
-                return member
-            return wrap(local, member)
-
+            return list(objs)
 
 class ThreadSyncNode(SyncNode):
     def __init__(self, *arg, **kw):
-        self._sync_connected_peers = []
-        self._sync_outbound_thread  = None
-        self._sync_outbound_connection_manager_thread = None
+        self._sync_thread  = None
         super(ThreadSyncNode, self).__init__(*arg, **kw)
 
     def commit(self):
@@ -127,64 +92,135 @@ class ThreadSyncNode(SyncNode):
         self.host.signal_change()
 
     def sync_start(self):
-        self._sync_outbound_thread = self.OutboundSyncThread(self, name="%s:outbound" % Visualizer.VisualizerOperations._id2label(self.node_id))
-        self._sync_outbound_connection_manager_thread = self.OutboundConnectionManagerThread(self, name="%s:connmgr" % Visualizer.VisualizerOperations._id2label(self.node_id))
+        self._sync_thread = self.ConnectionManager.listen(
+            self.get_local_node(), self, name="%s:ConnectionManager" % Visualizer.VisualizerOperations._id2label(self.node_id))
         
     def sync_stop(self):
-        self._sync_outbound_thread.shutdown()
-        self._sync_outbound_connection_manager_thread.shutdown()
-        self._sync_outbound_thread  = None
-        self._sync_outbound_connection_manager_thread = None
+        self._sync_thread.shutdown()
+        self._sync_thread  = None
 
-    def sync_add_peer(self, peer):
-        self._sync_connected_peers.append(peer)
-        self.host.signal_change()
+    class ConnectionManager(symmetricjsonrpc.RPCP2PNode):
+        class Thread(symmetricjsonrpc.RPCP2PNode.Thread):
+            class InboundConnection(symmetricjsonrpc.RPCP2PNode.Thread.InboundConnection):
+                class Thread(symmetricjsonrpc.RPCP2PNode.Thread.InboundConnection.Thread):
+                    class Request(symmetricjsonrpc.RPCP2PNode.Thread.InboundConnection.Thread.Request):
+                        def dispatch_request(self, subject):
+                            node = self.parent.parent.parent.parent.parent
 
-    def sync_remove_peer(self, peer):
-        self._sync_connected_peers.remove(peer)
-        self.host.signal_change()
+                            if not hasattr(Node.Node, subject['method']):
+                                raise AttributeError("Unknown or illegal method.", subject['method'])
+                            return getattr(node, subject['method'])(*subject['params'])
 
-    class OutboundConnectionManagerThread(symmetricjsonrpc.Thread):
-        def run_thread(self):
-            while not self._shutdown:
-                # Don't connect to localhost
-                peer_ids = [peer.node_id for peer in self.subject._sync_connected_peers] + [self.subject.node_id]
-                if len(peer_ids) == 1:
-                    sql = 'peer_id != %s'
-                else:
-                    sql = 'peer_id not in (%s)' % (', '.join('%s' for peer_id in peer_ids),)
-                non_connected_peers = self.subject.get_peers(_query_sql=(sql, peer_ids))
-                for peer_id in non_connected_peers:
-                    peer = self.subject.get_peer(peer_id)
-                    if peer:
-                        if debug_sync_connect: print "%s:connect:%s:success" % (self.getName(), Visualizer.VisualizerOperations._id2label(peer_id))
-                        self.subject.sync_add_peer(peer)
-                    else:
-                        if debug_sync_connect: print "%s:connect:%s:failed" % (self.getName(), Visualizer.VisualizerOperations._id2label(peer_id))
-                    if self._shutdown: return                
-                self.subject.host.wait_for_change(reconnect_delay)
+                        def dispatch_notification(self, subject):
+                            self.dispatch_request(subject)
 
-    class OutboundSyncThread(symmetricjsonrpc.Thread):
-        def run_thread(self):
-            while not self._shutdown:
-                syncs = 0
-                for peer in list(self.subject._sync_connected_peers): # Copy to avoid list changing under our feet...
-                    try:
-                        new_syncs = self.subject.sync_peer(peer)
-                        syncs += new_syncs
-                        if new_syncs: self.subject.commit()
-                    except:
-                        self.subject.rollback()
-                        import traceback
-                        traceback.print_exc()
-                        self.subject.sync_remove_peer(peer)
-                    if self._shutdown: return
-                new_syncs = self.subject.sync_self()
-                syncs += new_syncs
-                if new_syncs: self.subject.commit()
-                if self._shutdown: return
-                if not syncs:
-                    self.subject.host.wait_for_change(reconnect_delay)
+                        def dispatch_response(self, subject):
+                            # We do not support callback-style responses
+                            assert False
+                    
+                    def run_parent(self):
+                        """Sync connected peers"""
+
+                        connmgr = self.parent.parent.parent
+                        node = connmgr.parent
+
+                        peer_id = self.get_local_node()['peer_id']
+                        connmgr.sync_add_peer(peer_id, self.parent)
+
+                        try:
+                            try:
+                                while not self._shutdown:
+                                    syncs = node.sync_peer(peer)
+                                    if syncs: node.commit()
+                                    if self._shutdown: return
+                                    if not syncs:
+                                        node.host.wait_for_change(reconnect_delay)
+                            except:
+                                node.rollback()
+                                raise
+                        finally:
+                            connmgr.sync_remove_peer(peer)
+
+                @classmethod
+                def connect_to_peer(cls, peer, *arg, **kw):
+                    return cls(cls._connect_to_peer(peer), *arg, **kw)
+
+                @classmethod
+                def _connect_to_peer(cls, peer):
+                    parts = peer['last_seen_address'].split('/')
+                    conn = None
+                    for part in parts:
+                        addr_type, args = part.split(':', 1)
+                        args = args and args.split(':') or []
+                        conn = getattr(cls, "_connect_to_peer_%s" % (addr_type,))(conn, *args)
+                    return conn
+
+                @classmethod
+                def _connect_to_peer_tcp(self, conn, host, port):
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.connect((host, int(port)))
+                    return s
+
+            def run_parent(self):
+                """Connect to unconnected peers"""
+                node = self.parent.parent
+                
+                while not self._shutdown:
+                     # Don't connect to localhost
+                     peer_ids = self.parent.sync_connected_peers.keys() + [node.node_id]
+                     if len(peer_ids) == 1:
+                         sql = 'peer_id != %s'
+                     else:
+                         sql = 'peer_id not in (%s)' % (', '.join('%s' for peer_id in peer_ids),)
+                     non_connected_peers = node.get_peers(_query_sql=(sql, peer_ids))
+                     for peer in non_connected_peers:
+                         try:
+                             client = self.InboundConnection.connect_to_peer(
+                                 peer, self, name="%s:client:%s" % (self.getName(), Visualizer.VisualizerOperations._id2label(peer['peer_id'])))
+                             if debug_sync_connect:
+                                 print "%s:connect:%s@%s:success" % (self.getName(), Visualizer.VisualizerOperations._id2label(peer['peer_id']), peer['last_seen_address'])
+                         except:
+                             if debug_sync_connect:
+                                 print "%s:connect:%s@%s:failed:" % (self.getName(), Visualizer.VisualizerOperations._id2label(peer['peer_id']), peer['last_seen_address'])
+                                 traceback.print_exc()
+                         if self._shutdown: return          
+                     node.host.wait_for_change(reconnect_delay)
+
+        def _init(self, *arg, **kw):
+            self.sync_connected_peers = {}
+            symmetricjsonrpc.RPCP2PNode._init(self, *arg, **kw)
+
+        def sync_add_peer(self, peer, thread):
+            node = self.parent
+            self.sync_connected_peers[peer] = thread
+            node.host.signal_change()
+
+        def sync_remove_peer(self, peer):
+            node = self.parent
+            del self.sync_connected_peers[peer]
+            node.host.signal_change()
+
+        @classmethod
+        def listen(cls, node, *arg, **kw):
+            return cls(cls._listen(node), *arg, **kw)
+
+        @classmethod
+        def _listen(cls, node):
+            parts = node['last_seen_address'].split('/')
+            conn = None
+            for part in parts:
+                addr_type, args = part.split(':', 1)
+                args = args and args.split(':') or []
+                conn = getattr(cls, "_listen_%s" % (addr_type,))(conn, *args)
+            return conn
+
+        @classmethod
+        def _listen_tcp(cls, conn, host, port):
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind((host, int(port)))
+            s.listen(1)
+            return s
 
 class IntrospectionNode(Node.Node):
     def _get_messages(self, **kw):

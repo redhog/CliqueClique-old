@@ -33,7 +33,10 @@ class Table(object):
         def __exit__(self, exc_type, exc_value, traceback):
             self.cur.close()
             if exc_value is not None:
-                exc_value.args = exc_value.args + (self.arg, self.kw)
+                if isinstance(exc_value, (str, unicode)):
+                    raise Exception, Exception(exc_value, self.arg, self.kw), traceback
+                else:
+                    exc_value.args = exc_value.args + (self.arg, self.kw)
 
         def __iter__(self):
             return self
@@ -43,7 +46,7 @@ class Table(object):
             row = self.cur.fetchone()
             if row is None: raise StopIteration
             if self.cols is None: self.cols = [dsc[0] for dsc in self.cur.description]
-            return dict(zip(self.cols, row))
+            return dict(zip(self.cols, [self.conn.convert_data_out(data) for data in row]))
     
     @classmethod
     def _select_dicts(cls, conn, *arg, **kw):
