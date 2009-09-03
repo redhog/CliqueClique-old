@@ -7,6 +7,7 @@ import traceback
 
 debug_sync = True
 debug_sync_connect = True
+debug_sync_connect_details = False
 reconnect_delay = 10.0
 
 class HostedNode(Node.Node):
@@ -42,11 +43,11 @@ class SyncNode(HostedNode):
         if not send:
             self, other = other, self
 
-        subscription, message, delete_subscription = self.get_subscription_update(other.node_id)
+        subscription, message, delete_subscription = self.get_subscription_update(other.get_local_node()['node_id'])
         if subscription:
             if debug_sync:
-                print "Sync: %s -> %s : %s, %s, delete:%s" % (Visualizer.VisualizerOperations._id2label(self.node_id),
-                                                              Visualizer.VisualizerOperations._id2label(other.node_id),
+                print "Sync: %s -> %s : %s, %s, delete:%s" % (Visualizer.VisualizerOperations._id2label(self.get_local_node()['node_id']),
+                                                              Visualizer.VisualizerOperations._id2label(other.get_local_node()['node_id']),
                                                               subscription and Visualizer.VisualizerOperations._ids2labels(dict(subscription)),
                                                               message and Visualizer.VisualizerOperations._ids2labels(dict(message)),
                                                               delete_subscription)
@@ -54,7 +55,7 @@ class SyncNode(HostedNode):
                 other.delete_subscription(subscription)
             else:
                 # Yes, ignore result if syncing self, just pretend we did an update
-                if self.node_id != other.node_id:
+                if self.get_local_node()['node_id'] != other.get_local_node()['node_id']:
                     if message:
                         other.register_message(message, subscription)
                     else:
@@ -74,12 +75,12 @@ class SyncNode(HostedNode):
         message = other.get_message(message_id)
         self.register_message(
             message,
-            {'peer_id': other.node_id,
+            {'peer_id': other.get_local_node()['node_id'],
              'message_id': message['message_id']})
         self.update_local_subscription(message, 0)
 
     def get_peers(self, *arg, **kw):
-        with Tables.Peer.select_objs(self._conn, self.node_id, *arg, **kw) as objs:
+        with Tables.Peer.select_objs(self._conn, self.get_local_node()['node_id'], *arg, **kw) as objs:
             return list(objs)
 
 class ThreadSyncNode(SyncNode):
@@ -93,7 +94,7 @@ class ThreadSyncNode(SyncNode):
 
     def sync_start(self):
         self._sync_thread = self.ConnectionManager.listen(
-            self.get_local_node(), self, name="%s:ConnectionManager" % Visualizer.VisualizerOperations._id2label(self.node_id))
+            self.get_local_node(), self, name="%s:ConnectionManager" % Visualizer.VisualizerOperations._id2label(self.get_local_node()['node_id']))
         
     def sync_stop(self):
         self._sync_thread.shutdown()
@@ -130,7 +131,7 @@ class ThreadSyncNode(SyncNode):
                         try:
                             try:
                                 while not self._shutdown:
-                                    syncs = node.sync_peer(peer)
+                                    syncs = node.sync_peer(self)
                                     if syncs: node.commit()
                                     if self._shutdown: return
                                     if not syncs:
@@ -139,7 +140,7 @@ class ThreadSyncNode(SyncNode):
                                 node.rollback()
                                 raise
                         finally:
-                            connmgr.sync_remove_peer(peer)
+                            connmgr.sync_remove_peer(peer_id)
 
                 @classmethod
                 def connect_to_peer(cls, peer, *arg, **kw):
@@ -167,7 +168,7 @@ class ThreadSyncNode(SyncNode):
                 
                 while not self._shutdown:
                      # Don't connect to localhost
-                     peer_ids = self.parent.sync_connected_peers.keys() + [node.node_id]
+                     peer_ids = self.parent.sync_connected_peers.keys() + [node.get_local_node()['node_id']]
                      if len(peer_ids) == 1:
                          sql = 'peer_id != %s'
                      else:
@@ -182,7 +183,8 @@ class ThreadSyncNode(SyncNode):
                          except:
                              if debug_sync_connect:
                                  print "%s:connect:%s@%s:failed:" % (self.getName(), Visualizer.VisualizerOperations._id2label(peer['peer_id']), peer['last_seen_address'])
-                                 traceback.print_exc()
+                                 if debug_sync_connect_details:
+                                     traceback.print_exc()
                          if self._shutdown: return          
                      node.host.wait_for_change(reconnect_delay)
 
@@ -224,16 +226,16 @@ class ThreadSyncNode(SyncNode):
 
 class IntrospectionNode(Node.Node):
     def _get_messages(self, **kw):
-        return Tables.Message.select_objs(self._conn, node_id = self.node_id, **kw)
+        return Tables.Message.select_objs(self._conn, node_id = self.get_local_node()['node_id'], **kw)
 
     def _get_local_subscriptions(self, **kw):
-        return Tables.LocalSubscription.select_objs(self._conn, node_id = self.node_id, **kw)
+        return Tables.LocalSubscription.select_objs(self._conn, node_id = self.get_local_node()['node_id'], **kw)
 
     def _get_subscriptions(self, **kw):
-        return Tables.Subscription.select_objs(self._conn, node_id = self.node_id, **kw)
+        return Tables.Subscription.select_objs(self._conn, node_id = self.get_local_node()['node_id'], **kw)
 
     def _get_message_links(self, **kw):
-        return Tables.MessageLink.select_objs(self._conn, node_id = self.node_id, **kw)
+        return Tables.MessageLink.select_objs(self._conn, node_id = self.get_local_node()['node_id'], **kw)
 
 
 class UINode(Node.Node):
@@ -245,24 +247,24 @@ class UINode(Node.Node):
         return message
 
     def update_local_subscription(self, message, subscribed = 1):
-        subscription = Tables.Subscription.select_obj(self._conn, node_id = self.node_id, peer_id = self.node_id, message_id = message['message_id'])
+        subscription = Tables.Subscription.select_obj(self._conn, node_id = self.get_local_node()['node_id'], peer_id = self.get_local_node()['node_id'], message_id = message['message_id'])
         if subscription is None:
-            subscription = {'peer_id': self.node_id,
+            subscription = {'peer_id': self.get_local_node()['node_id'],
                             'message_id': message['message_id'],
                             'local_is_subscribed': 1,
                             'local_center_node_is_subscribed': 1,
-                            'local_center_node_id': self.node_id,
+                            'local_center_node_id': self.get_local_node()['node_id'],
                             'local_center_distance': 1,
                             'remote_is_subscribed': 1,
                             'remote_center_node_is_subscribed': 1,
-                            'remote_center_node_id': self.node_id,
+                            'remote_center_node_id': self.get_local_node()['node_id'],
                             'remote_center_distance': 0}
         subscription['remote_is_subscribed'] = subscribed
         subscription['remote_center_node_is_subscribed'] = subscribed
         self.update_subscription(subscription)
 
     def delete_local_subscription(self, message):
-        subscription = Tables.Subscription.select_obj(self._conn, node_id = self.node_id, peer_id = self.node_id, message_id = message['message_id'])
+        subscription = Tables.Subscription.select_obj(self._conn, node_id = self.get_local_node()['node_id'], peer_id = self.get_local_node()['node_id'], message_id = message['message_id'])
         if subscription is not None:
             self.delete_subscription(subscription)
 

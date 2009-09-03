@@ -74,10 +74,16 @@ class Node(NodeOperations):
                                 {'do_mirror': 0}))
     
     def get_peer(self, peer_id):
-        return Tables.Peer.select_obj(self._conn, self.node_id, peer_id)
+        res = Tables.Peer.select_obj(self._conn, self.node_id, peer_id)
+        if res:
+            del res['last_seen_time'] # FIXME: Unable to send this over JSON
+        return res
 
     def get_local_node(self):
-        return Tables.Peer.select_obj(self._conn, self.node_id, self.node_id)
+        res = Tables.Peer.select_obj(self._conn, self.node_id, self.node_id)
+        if res:
+            del res['last_seen_time'] # FIXME: Unable to send this over JSON
+        return res
 
     def challenge_message(self, message_challenge_id):
         return Tables.Message.select_obj(
