@@ -85,6 +85,7 @@ class SyncNode(HostedNode):
 
 class ThreadSyncNode(SyncNode):
     def __init__(self, *arg, **kw):
+        self._janitor_thread = None
         self._sync_thread  = None
         super(ThreadSyncNode, self).__init__(*arg, **kw)
 
@@ -93,13 +94,30 @@ class ThreadSyncNode(SyncNode):
         self.host.signal_change()
 
     def sync_start(self):
+        self._janitor_thread = self.Janitor(None, self, name="%s:Janitor" % Visualizer.VisualizerOperations._id2label(self.get_local_node()['node_id']))
         self._sync_thread = self.ConnectionManager.listen(
             self.get_local_node(), self, name="%s:ConnectionManager" % Visualizer.VisualizerOperations._id2label(self.get_local_node()['node_id']))
         
     def sync_stop(self):
+        self._janitor_thread.shutdown()
+        self._janitor_thread  = None
         self._sync_thread.shutdown()
         self._sync_thread  = None
 
+    class Janitor(symmetricjsonrpc.Thread):
+        def run_thread(self):
+            node = self.parent
+            while not self._shutdown:
+                try:
+                    syncs = node.sync_self()
+                    if syncs: node.commit()
+                    if self._shutdown: return
+                    if not syncs:
+                        node.host.wait_for_change(reconnect_delay)
+                except:
+                    node.rollback()
+                    traceback.print_exc()
+        
     class ConnectionManager(symmetricjsonrpc.RPCP2PNode):
         class Thread(symmetricjsonrpc.RPCP2PNode.Thread):
             class InboundConnection(symmetricjsonrpc.RPCP2PNode.Thread.InboundConnection):
