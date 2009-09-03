@@ -2,7 +2,7 @@ from __future__ import with_statement
 
 import contextlib, datetime, md5, os.path, Utils, Tables, Node, LocalNode, Config, threading
 
-debug_change_wait = True
+debug_change_wait = False
 debug_change_wait_details = False
 
 class Host(object):

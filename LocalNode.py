@@ -6,7 +6,7 @@ import symmetricjsonrpc
 import traceback
 
 debug_sync = True
-debug_sync_connect = True
+debug_sync_connect = False
 debug_sync_connect_details = False
 reconnect_delay = 10.0
 
