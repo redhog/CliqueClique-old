@@ -5,7 +5,7 @@ import Utils, Tables, Node, Visualizer
 import symmetricjsonrpc
 import traceback
 
-debug_sync = True
+debug_sync = False
 debug_sync_connect = False
 debug_sync_connect_details = False
 reconnect_delay = 10.0
@@ -128,7 +128,14 @@ class ThreadSyncNode(SyncNode):
 
                             if not hasattr(Node.Node, subject['method']):
                                 raise AttributeError("Unknown or illegal method.", subject['method'])
-                            return getattr(node, subject['method'])(*subject['params'])
+                            try:
+                                res = getattr(node, subject['method'])(*subject['params'])
+                            except:
+                                node.rollback()
+                                raise
+                            else:
+                                node.commit()
+                            return res
 
                         def dispatch_notification(self, subject):
                             self.dispatch_request(subject)
