@@ -303,58 +303,62 @@ class UINode(Node.Node):
 
 
 class ExprNode(Node.Node):
-    def get_messages_by_expr(self, expr):        
-        def expr_to_sql(expr, prev, info):
-            data = {"alias_id": info['alias'],
-                    "node_id": self.node_id,
-                    "prev": prev,
-                    "param": Tables.Message._paramstyle_from_conn(self._conn)}
-
-            froms = []
-            wheres = []
-            params = []
-
-            if not expr:
-                pass
-            elif expr[0] == ":id":
-                wheres.append("%(prev)s = %(param)s" % data)
-                params.append(expr[1])
-            elif expr[0] == "->":
-                info['alias'] += 1
-                froms, wheres, params = expr_to_sql(
-                    expr[1],
-                    "a%(alias_id)s.dst_message_id" % data,
-                    info)
-                froms.append("message_link as a%(alias_id)s" % data)
-                wheres.append("""(    a%(alias_id)s.node_id = %(node_id)s
-                                  and a%(alias_id)s.src_message_id = %(prev)s)""" % data)
-            elif expr[0] == "&":
-                for arg in expr[1:]:
-                    info['alias'] += 1
-                    froms1, wheres1, params1 = expr_to_sql(arg, prev, info)
-                    froms.extend(froms1)
-                    wheres.extend(wheres1)
-                    params.extend(params1)
-            elif expr[0] == "|":
-                for arg in expr[1:]:
-                    info['alias'] += 1
-                    froms1, wheres1, params1 = expr_to_sql(arg, prev, info)
-                    froms.extend(froms1)
-                    wheres.extend(wheres1)
-                    params.extend(params1)
-                wheres = ['(%s)' % (' or '.join(wheres),)]
-            elif expr[0] == "!":
-                info['alias'] += 1
-                froms, wheres, params = expr_to_sql(expr[1], prev, info)
-                wheres = ['not (%s)' % (' and '.join(wheres),)]
-            else:
-                raise Exception("Unknown expression operator %s" % (expr[0],))
-            return (froms, wheres, params)
-
-        froms, wheres, params = expr_to_sql(expr, "message.message_id", {"alias": 0})
-
+    def get_messages_by_expr(self, expr):
+        froms, wheres, params = self._message_expr_to_sql(
+            expr, "message.message_id", {"alias": 0})
         return Tables.Message.select_objs(
             self._conn, self.node_id, _query_sql=(froms, ' and '.join(wheres), params))
+
+    def _message_expr_to_sql(self, expr, prev, info): 
+        data = {"alias_id": info['alias'],
+                "node_id": self.node_id,
+                "prev": prev,
+                "param": Tables.Message._paramstyle_from_conn(self._conn)}
+        if not expr:
+            return self._message_expr_to_sql_all(expr, prev, info, data)
+        return getattr(self, "_message_expr_to_sql_" + expr[0])(expr, prev, info, data)
+
+    def _message_expr_to_sql_all(self, expr, prev, info, data):
+        return ([], [], [])
+
+    def _message_expr_to_sql_id(self, expr, prev, info, data): 
+        return ([], ["%(prev)s = %(param)s" % data], [expr[1]])
+
+    def _message_expr_to_sql_linksto(self, expr, prev, info, data): 
+        info['alias'] += 1
+        froms, wheres, params = self._message_expr_to_sql(
+            expr[1],
+            "a%(alias_id)s.dst_message_id" % data,
+            info)
+        froms.append("message_link as a%(alias_id)s" % data)
+        wheres.append("""(    a%(alias_id)s.node_id = %(node_id)s
+                          and a%(alias_id)s.src_message_id = %(prev)s)""" % data)
+        return (froms, wheres, params)
+    
+    def _message_expr_to_sql_and(self, expr, prev, info, data): 
+        froms = []
+        wheres = []
+        params = []
+        for arg in expr[1:]:
+            info['alias'] += 1
+            froms1, wheres1, params1 = self._message_expr_to_sql(arg, prev, info)
+            froms.extend(froms1)
+            wheres.extend(wheres1)
+            params.extend(params1)
+        return (froms, wheres, params)
+
+    def _message_expr_to_sql_or(self, expr, prev, info, data): 
+        froms = []
+        wheres = []
+        params = []
+        for arg in expr[1:]:
+            info['alias'] += 1
+            froms1, wheres1, params1 = self._message_expr_to_sql(arg, prev, info)
+            froms.extend(froms1)
+            wheres.extend(wheres1)
+            params.extend(params1)
+        wheres = ['(%s)' % (' or '.join(wheres),)]
+        return (froms, wheres, params)
 
 
 class LocalNode(ThreadSyncNode, IntrospectionNode, UINode, ExprNode):
