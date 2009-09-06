@@ -307,7 +307,8 @@ class ExprNode(Node.Node):
         def expr_to_sql(expr, prev, info):
             data = {"alias_id": info['alias'],
                     "node_id": self.node_id,
-                    "prev": prev}
+                    "prev": prev,
+                    "param": Tables.Message._paramstyle_from_conn(self._conn)}
 
             froms = []
             wheres = []
@@ -316,8 +317,8 @@ class ExprNode(Node.Node):
             if not expr:
                 pass
             elif expr[0] == ":id":
-                wheres.append("%(prev)s = ?" % data)
-                params.append(arg[1])
+                wheres.append("%(prev)s = %(param)s" % data)
+                params.append(expr[1])
             elif expr[0] == "->":
                 info['alias'] += 1
                 froms, wheres, params = expr_to_sql(
