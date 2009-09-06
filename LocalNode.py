@@ -335,6 +335,17 @@ class ExprNode(Node.Node):
                           and a%(alias_id)s.src_message_id = %(prev)s)""" % data)
         return (froms, wheres, params)
     
+    def _message_expr_to_sql_linkedfrom(self, expr, prev, info, data): 
+        info['alias'] += 1
+        froms, wheres, params = self._message_expr_to_sql(
+            expr[1],
+            "a%(alias_id)s.src_message_id" % data,
+            info)
+        froms.append("message_link as a%(alias_id)s" % data)
+        wheres.append("""(    a%(alias_id)s.node_id = %(node_id)s
+                          and a%(alias_id)s.dst_message_id = %(prev)s)""" % data)
+        return (froms, wheres, params)
+    
     def _message_expr_to_sql_and(self, expr, prev, info, data): 
         froms = []
         wheres = []
