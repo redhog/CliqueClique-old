@@ -198,7 +198,7 @@ class ThreadSyncNode(SyncNode):
                          sql = 'peer_id != %s'
                      else:
                          sql = 'peer_id not in (%s)' % (', '.join('%s' for peer_id in peer_ids),)
-                     non_connected_peers = node.get_peers(_query_sql=(sql, peer_ids))
+                     non_connected_peers = node.get_peers(_query_sql=([], sql, peer_ids))
                      for peer in non_connected_peers:
                          try:
                              client = self.InboundConnection.connect_to_peer(
@@ -302,5 +302,59 @@ class UINode(Node.Node):
                                   'dst_message_id': dst_message['message_id']})
 
 
-class LocalNode(ThreadSyncNode, IntrospectionNode, UINode):
+class ExprNode(Node.Node):
+    def get_messages_by_expr(self, expr):        
+        def expr_to_sql(expr, prev, info):
+            data = {"alias_id": info['alias'],
+                    "node_id": self.node_id,
+                    "prev": prev}
+
+            froms = []
+            wheres = []
+            params = []
+
+            if not expr:
+                pass
+            elif expr[0] == ":id":
+                wheres.append("%(prev)s = ?" % data)
+                params.append(arg[1])
+            elif expr[0] == "->":
+                info['alias'] += 1
+                froms, wheres, params = expr_to_sql(
+                    expr[1],
+                    "a%(alias_id)s.dst_message_id" % data,
+                    info)
+                froms.append("message_link as a%(alias_id)s" % data)
+                wheres.append("""(    a%(alias_id)s.node_id = %(node_id)s
+                                  and a%(alias_id)s.src_message_id = %(prev)s)""" % data)
+            elif expr[0] == "&":
+                for arg in expr[1:]:
+                    info['alias'] += 1
+                    froms1, wheres1, params1 = expr_to_sql(arg, prev, info)
+                    froms.extend(froms1)
+                    wheres.extend(wheres1)
+                    params.extend(params1)
+            elif expr[0] == "|":
+                for arg in expr[1:]:
+                    info['alias'] += 1
+                    froms1, wheres1, params1 = expr_to_sql(arg, prev, info)
+                    froms.extend(froms1)
+                    wheres.extend(wheres1)
+                    params.extend(params1)
+                wheres = ['(%s)' % (' or '.join(wheres),)]
+            elif expr[0] == "!":
+                info['alias'] += 1
+                froms, wheres, params = expr_to_sql(expr[1], prev, info)
+                wheres = ['not (%s)' % (' and '.join(wheres),)]
+            else:
+                raise Exception("Unknown expression operator %s" % (expr[0],))
+            return (froms, wheres, params)
+
+        froms, wheres, params = expr_to_sql(expr, "message.message_id", {"alias": 0})
+
+        return Tables.Message.select_objs(
+            self._conn, self.node_id, _query_sql=(froms, ' and '.join(wheres), params))
+
+
+class LocalNode(ThreadSyncNode, IntrospectionNode, UINode, ExprNode):
     pass

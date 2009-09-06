@@ -62,9 +62,9 @@ class Table(object):
     @classmethod
     def _get_query(cls, conn, *arg, **kw):
         kw.update(dict(zip(cls.id_cols, arg)))
-        extra_sql, extra_params = kw.pop('_query_sql', ("1 = 1", []))
+        extra_froms, extra_sql, extra_params = kw.pop('_query_sql', ([], "1 = 1", []))
         if not kw:
-            return extra_sql, extra_params
+            return extra_froms, extra_sql, extra_params
         query_keys = kw.keys()
         query_sql_parts = []
         for query_key in query_keys:
@@ -82,16 +82,21 @@ class Table(object):
                 query_params.extend(kw[query_key])
             else:
                 query_params.append(kw[query_key])
-        return extra_sql + " and " + query_sql, extra_params + query_params
+        return extra_froms, extra_sql + " and " + query_sql, extra_params + query_params
 
     @classmethod
     def select_objs(cls, conn, *arg, **kw):
         cols = "*"
         if cls.cols:
             cols = ', '.join(cls.cols)
-        query_sql, query_params = cls._get_query(conn, *arg, **kw)
-        return cls._select_dicts(conn, "select %s from %s where %s" % (cols, cls.table_name, query_sql),
-                                 query_params)
+        query_froms, query_sql, query_params = cls._get_query(conn, *arg, **kw)
+        
+        return cls._select_dicts(
+            conn,
+            "select %s from %s where %s" % (cols,
+                                            ', '.join([cls.table_name] + query_froms),
+                                            query_sql),
+            query_params)
     
     @classmethod
     def select_obj(cls, conn, *arg, **query):
@@ -100,14 +105,6 @@ class Table(object):
                 return result
             return None
 
-    @classmethod
-    def select_objs_sql(cls, conn, query_sql, query_params = ()):
-        return cls.select_objs(conn, _query_sql = (query_sql, query_params))
-    
-    @classmethod
-    def select_obj_sql(cls, conn, query_sql, query_params = ()):
-        return cls.select_obj(conn, _query_sql = (query_sql, query_params))
-    
     @classmethod
     def create_or_update(cls, conn, obj):
         id_col_values = [obj[col] for col in cls.id_cols]
@@ -120,8 +117,8 @@ class Table(object):
         with contextlib.closing(conn.cursor()) as cur:
             if existing:
                 if obj_non_id_cols:
-
-                    query_sql, query_params = cls._get_query(conn, *id_col_values)
+                    query_froms, query_sql, query_params = cls._get_query(conn, *id_col_values)
+                    # FIXME: What about froms???
                     cur.execute("""update %s set %s where %s""" % (cls.table_name,
                                                                    ', '.join("%s = %s" % (col, cls._paramstyle_from_conn(conn)) for col in obj_non_id_cols),
                                                                    query_sql),
@@ -135,7 +132,8 @@ class Table(object):
 
     @classmethod
     def delete(cls, conn, *arg, **kw):
-        query_sql, query_params = cls._get_query(conn, *arg, **kw)
+        query_froms, query_sql, query_params = cls._get_query(conn, *arg, **kw)
+        # FIXME: What about froms???
         with contextlib.closing(conn.cursor()) as cur:
             cur.execute("delete from %s where %s" % (cls.table_name, query_sql),
                         query_params)

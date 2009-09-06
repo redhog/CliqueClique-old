@@ -23,7 +23,7 @@ class Host(object):
         return self._node_cache[node_id]
             
     def get_nodes(self):
-        with Tables.Peer.select_objs_sql(self._conn, "node_id = peer_id") as objs:
+        with Tables.Peer.select_objs(self._conn, _query_sql=([], "node_id = peer_id", [])) as objs:
             return [obj['node_id']
                     for obj in objs]
 
