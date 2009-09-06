@@ -72,9 +72,14 @@ class Table(object):
                 if not kw[query_key]:
                     query_sql_parts.append("false")
                 else:
-                    query_sql_parts.append("%s in (%s)" % (query_key, ", ".join(cls._paramstyle_from_conn(conn) for x in  kw[query_key])))
+                    query_sql_parts.append(
+                        "%s.%s in (%s)" % (cls.table_name,
+                                           query_key,
+                                           ", ".join(cls._paramstyle_from_conn(conn)
+                                                     for x in  kw[query_key])))
             else:
-                query_sql_parts.append("%s = %s" % (query_key, cls._paramstyle_from_conn(conn)))
+                query_sql_parts.append(
+                    "%s.%s = %s" % (cls.table_name, query_key, cls._paramstyle_from_conn(conn)))
         query_sql = ' and '.join(query_sql_parts)
         query_params = []
         for query_key in query_keys:
@@ -88,7 +93,7 @@ class Table(object):
     def select_objs(cls, conn, *arg, **kw):
         cols = "*"
         if cls.cols:
-            cols = ', '.join(cls.cols)
+            cols = ', '.join("%s.%s" % (cls.table_name, col) for col in cls.cols)
         query_froms, query_sql, query_params = cls._get_query(conn, *arg, **kw)
         
         return cls._select_dicts(
