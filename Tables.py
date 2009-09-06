@@ -32,3 +32,6 @@ class LocalSubscription(Table.Table):
     table_name = "full_recursive_local_subscription"
     id_cols = ('node_id', 'message_id')
 
+class Annotation(Table.Table):
+    table_name = "annotation"
+    id_cols = ('node_id', 'name', 'message_id', 'peer_id')

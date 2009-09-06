@@ -69,6 +69,7 @@ class Table(object):
         query_sql_parts = []
         for query_key in query_keys:
             if isinstance(kw[query_key], (list, tuple, set)) and len(kw[query_key]) != 1:
+                # FIXME: How to handle nulls here?
                 if not kw[query_key]:
                     query_sql_parts.append("false")
                 else:
@@ -77,6 +78,9 @@ class Table(object):
                                            query_key,
                                            ", ".join(cls._paramstyle_from_conn(conn)
                                                      for x in  kw[query_key])))
+            elif kw[query_key] is None:
+                query_sql_parts.append(
+                    "%s.%s is null" % (cls.table_name, query_key))
             else:
                 query_sql_parts.append(
                     "%s.%s = %s" % (cls.table_name, query_key, cls._paramstyle_from_conn(conn)))
@@ -85,6 +89,8 @@ class Table(object):
         for query_key in query_keys:
             if isinstance(kw[query_key], (list, tuple, set)):
                 query_params.extend(kw[query_key])
+            elif kw[query_key] is None:
+                pass
             else:
                 query_params.append(kw[query_key])
         return extra_froms, extra_sql + " and " + query_sql, extra_params + query_params

@@ -1,4 +1,4 @@
-drop table if exists annotations cascade;
+drop table if exists annotation cascade;
 drop table if exists subscription cascade;
 drop table if exists message cascade;
 drop table if exists peer cascade;
@@ -43,7 +43,7 @@ create table subscription (
  foreign key (node_id, peer_id) references peer(node_id, peer_id)
 );
 
-create table annotations (
+create table annotation (
  node_id numeric,
  message_id numeric, -- can be null to annotate the peer itself
  peer_id numeric,

@@ -264,6 +264,22 @@ class IntrospectionNode(Node.Node):
 
 
 class UINode(Node.Node):
+    def set_annotation(self, name, value, message = None, peer = None):
+        Tables.Annotation.create_or_update(
+            self._conn,
+            {'node_id': self.node_id,
+             'name': name,
+             'message_id': message and message['message_id'] or None,
+             'peer_id': peer and peer['peer_id'] or None,
+             'value': value})
+        
+    def get_annotation(self, name, message = None, peer = None):
+        return Tables.Annotation.select_obj(
+            self._conn, self.node_id,
+            name,
+            message and message['message_id'] or None,
+            peer and peer['peer_id'] or None)['value']
+
     def post_message(self, message):
         message['message_id'] = self.calculate_message_id(message)
         message['message_challenge_id'] = self.calculate_message_challenge_id(message)
@@ -323,6 +339,18 @@ class ExprNode(Node.Node):
 
     def _message_expr_to_sql_id(self, expr, prev, info, data): 
         return ([], ["%(prev)s = %(param)s" % data], [expr[1]])
+
+    def _message_expr_to_sql_anno(self, expr, prev, info, data): 
+        info['alias'] += 1
+
+        froms = ["annotation as a%(alias_id)s" % data]
+        wheres = ["""(    a%(alias_id)s.node_id = %(node_id)s
+                      and a%(alias_id)s.name = %(param)s
+                      and a%(alias_id)s.value = %(param)s
+                      and a%(alias_id)s.message_id = %(prev)s
+                      and a%(alias_id)s.peer_id = null)""" % data]
+        params = [expr[1], expr[1]]
+        return (froms, wheres, params)
 
     def _message_expr_to_sql_linksto(self, expr, prev, info, data): 
         info['alias'] += 1
