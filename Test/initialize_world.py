@@ -13,17 +13,16 @@ def create(n, name):
     n.set_annotation("global_attribute_cache", "/system/%s" % name, res)
     return res
 
-
 musage = create(n0, 'usage')
 def setusage(n, m, u):
     return n.post_link_message(
-        '', n.post_link_message('', m, u), musage)
+        'linkisusage', n.post_link_message('usagelink', m, u), musage)
 
 mtype = create(n0, 'type')
 def settype(n, m, t):
     setusage(
         n,
-        n.post_link_message('', m, t),
+        n.post_link_message('typelink', m, t),
         mtype)
 settype(n0, mtype, mtype)
 
@@ -31,26 +30,18 @@ msubtype = create(n0, 'subtype')
 def setsubtype(n, t, p):
     setusage(
         n,
-        n.post_link_message('', t, p),
+        n.post_link_message('subtypelink', t, p),
         msubtype)
 
-settype(n0, mtypetext, mtype)
-setsubtype(n0, mtypetext, mtype):
+def createtype(n, name, parent):
+    res = create(n, name)
+    settype(n, res, mtype)
+    setsubtype(n, res, parent)
+    return res
 
-mtypetext = create(n0, 'text')
-settype(n0, mtypetext, mtype)
-setsubtype(n0, mtypetext, mtype):
-
-mtypehtml = create(n0, 'html')
-settype(n0, mtypehtml, mtype)
-setsubtype(n0, mtypehtml, mtypetext):
-
-
-m2 = n0.post_text_message('Comment')
-m3 = n0.post_link_message('Link', m1, m2)
-
-n0.set_annotation("foo", "bar", m1)
+mtypetext = createtype(n0, 'text', mtype)
+mtypexml = createtype(n0, 'xml', mtypetext)
+mtypexhtml = createtype(n0, 'xhtml', mtypexml)
+mtypecss = createtype(n0, 'css', mtypetext)
 
 n0.commit()
-
-print n0.get_annotation("foo", m1)
