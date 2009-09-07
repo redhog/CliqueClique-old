@@ -14,45 +14,36 @@ def create(n, name):
     return res
 
 
-musage = create(n, 'usage')
-
+musage = create(n0, 'usage')
 def setusage(n, m, u):
     return n.post_link_message(
         '', n.post_link_message('', m, u), musage)
 
-mtype = create(n, 'type')
-
+mtype = create(n0, 'type')
 def settype(n, m, t):
     setusage(
-        n0.post_link_message('', m, t),
+        n,
+        n.post_link_message('', m, t),
         mtype)
+settype(n0, mtype, mtype)
 
-settype(mtype, mtype)
+msubtype = create(n0, 'subtype')
+def setsubtype(n, t, p):
+    setusage(
+        n,
+        n.post_link_message('', t, p),
+        msubtype)
 
-msubtype = create(n, 'subtype')
-settype(msubtype, mtype)
+settype(n0, mtypetext, mtype)
+setsubtype(n0, mtypetext, mtype):
 
+mtypetext = create(n0, 'text')
+settype(n0, mtypetext, mtype)
+setsubtype(n0, mtypetext, mtype):
 
-mtypetext = create('text')
-settype(mtypetext, mtype)
-
-mtypehtml = create('html')
-settype(mtypetext, mtype)
-
-
-n0.post_link_message('',
-                     n0.post_link_message('',
-                                          n0.post_link_message('',
-                                                               mtype,
-                                                               mtypetext),
-                                          msubtype),
-                     mtype)
-
-
-mtypetype = n0.post_link_message('Type of Type is Type', mtype, mtype)
-mtypetypetype = n0.post_link_message('Usage of link: message type', mtypetype, musage)
-
-
+mtypehtml = create(n0, 'html')
+settype(n0, mtypehtml, mtype)
+setsubtype(n0, mtypehtml, mtypetext):
 
 
 m2 = n0.post_text_message('Comment')
