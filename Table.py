@@ -1,7 +1,7 @@
 from __future__ import with_statement
 import contextlib, sys
 
-
+debug_selects = False
 
 class Table(object):
     table_name = None
@@ -50,6 +50,7 @@ class Table(object):
     
     @classmethod
     def _select_dicts(cls, conn, *arg, **kw):
+        if debug_selects: print "%s._select_dicts(%s, %s)" % (cls.__name__, arg, kw)
         return cls._SelectDicts(conn, *arg, **kw)
                 
     @classmethod
@@ -97,7 +98,7 @@ class Table(object):
 
     @classmethod
     def select_objs(cls, conn, *arg, **kw):
-        cols = "*"
+        cols = "%s.*" % (cls.table_name,)
         if cls.cols:
             cols = ', '.join("%s.%s" % (cls.table_name, col) for col in cls.cols)
         query_froms, query_sql, query_params = cls._get_query(conn, *arg, **kw)

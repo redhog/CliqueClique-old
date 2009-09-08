@@ -319,9 +319,15 @@ class UINode(Node.Node):
 
 
 class ExprNode(Node.Node):
+    def get_message_by_expr(self, expr):
+        with self.get_messages_by_expr(expr) as msgs:
+            for msg in msgs:
+                return msg
+            return None
+
     def get_messages_by_expr(self, expr):
         froms, wheres, params = self._message_expr_to_sql(
-            expr, "message.message_id", {"alias": 0})
+            expr, "message.message_id", {"alias": 0, "vars": {}})
         return Tables.Message.select_objs(
             self._conn, self.node_id, _query_sql=(froms, ' and '.join(wheres), params))
 
@@ -336,6 +342,56 @@ class ExprNode(Node.Node):
 
     def _message_expr_to_sql_all(self, expr, prev, info, data):
         return ([], [], [])
+
+    def _message_expr_to_sql_var(self, expr, prev, info, data):
+        if expr[1] in info['vars']:
+            return [], ["%s = %s" % (prev, info['vars'][expr[1]])], []
+        else:
+            info['vars'][expr[1]] = prev
+            return [], [], []
+        
+    def _message_expr_to_sql_ignore(self, expr, prev, info, data):
+        info['alias'] += 1
+        froms, wheres, params = self._message_expr_to_sql(expr[1], "a%(alias_id)s.message_id" % data, info)
+        froms.append("message as a%(alias_id)s" % data)
+        wheres.append("a%(alias_id)s.node_id = %(param)s" % data)
+        params.append(self.node_id)
+        return froms, wheres, params
+
+    def _message_expr_to_sql_and(self, expr, prev, info, data): 
+        froms = []
+        wheres = []
+        params = []
+        for arg in expr[1:]:
+            froms1, wheres1, params1 = self._message_expr_to_sql(arg, prev, info)
+            froms.extend(froms1)
+            wheres.extend(wheres1)
+            params.extend(params1)
+        return (froms, wheres, params)
+
+    def _message_expr_to_sql_or(self, expr, prev, info, data): 
+        froms = []
+        wheres = []
+        params = []
+        for arg in expr[1:]:
+            froms1, wheres1, params1 = self._message_expr_to_sql(arg, prev, info)
+            froms.extend(froms1)
+            wheres.extend(wheres1)
+            params.extend(params1)
+        wheres = ['(%s)' % (' or '.join(wheres),)]
+        return (froms, wheres, params)
+
+    def _message_expr_to_sql_inv(self, expr, prev, info, data):
+        info['alias'] += 1
+        return self._message_expr_to_sql(
+            ["and",
+             ["var", data['alias_id']],
+             ["ignore",
+              ["and",
+               [expr[1],
+                ["var", data['alias_id']]],
+               expr[2]]]],
+            prev, info)
 
     def _message_expr_to_sql_id(self, expr, prev, info, data): 
         return ([], ["%(prev)s = %(param)s" % data], [expr[1]])
@@ -364,40 +420,43 @@ class ExprNode(Node.Node):
         return (froms, wheres, params)
     
     def _message_expr_to_sql_linkedfrom(self, expr, prev, info, data): 
-        info['alias'] += 1
-        froms, wheres, params = self._message_expr_to_sql(
-            expr[1],
-            "a%(alias_id)s.src_message_id" % data,
-            info)
-        froms.append("message_link as a%(alias_id)s" % data)
-        wheres.append("""(    a%(alias_id)s.node_id = %(node_id)s
-                          and a%(alias_id)s.dst_message_id = %(prev)s)""" % data)
-        return (froms, wheres, params)
-    
-    def _message_expr_to_sql_and(self, expr, prev, info, data): 
-        froms = []
-        wheres = []
-        params = []
-        for arg in expr[1:]:
-            info['alias'] += 1
-            froms1, wheres1, params1 = self._message_expr_to_sql(arg, prev, info)
-            froms.extend(froms1)
-            wheres.extend(wheres1)
-            params.extend(params1)
-        return (froms, wheres, params)
+        return self._message_expr_to_sql(
+            ["inv", "linksto", expr[1]],
+            prev, info)
 
-    def _message_expr_to_sql_or(self, expr, prev, info, data): 
-        froms = []
-        wheres = []
-        params = []
-        for arg in expr[1:]:
-            info['alias'] += 1
-            froms1, wheres1, params1 = self._message_expr_to_sql(arg, prev, info)
-            froms.extend(froms1)
-            wheres.extend(wheres1)
-            params.extend(params1)
-        wheres = ['(%s)' % (' or '.join(wheres),)]
-        return (froms, wheres, params)
+#     def _message_expr_to_sql_linkstovia(self, expr, prev, info, data): 
+#         return self._message_expr_to_sql_and(
+#             ["linksto",
+#              ["and",
+#               arg[1],
+#               ["linksto", arg[2]]]],
+#             prev, info)
+
+#     def _message_expr_to_sql_linkedfromvia(self, expr, prev, info, data): 
+#         return self._message_expr_to_sql_and(
+#             ["linkedfrom",
+#              ["and",
+#               arg[1],
+#               ["linkedfrom", arg[2]]]],
+#             prev, info)
+
+#     def _message_expr_to_sql_usageis(self, expr, prev, info, data): 
+#         return self._message_expr_to_sql_and(
+#             ["linkstovia",
+#              ["anno"
+#               "global_attribute_cache",
+#               "/system/usage"],
+#              arg[1]],
+#             prev, info)
+
+#     def _message_expr_to_sql_usageis(self, expr, prev, info, data): 
+#         return self._message_expr_to_sql_and(
+#             ["linkstovia",
+#              ["anno"
+#               "global_attribute_cache",
+#               "/system/usage"],
+#              arg[1]],
+#             prev, info)
 
 
 class LocalNode(ThreadSyncNode, IntrospectionNode, UINode, ExprNode):
