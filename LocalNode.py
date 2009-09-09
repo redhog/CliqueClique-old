@@ -485,19 +485,19 @@ class UINode(ExprNode):
                                   'src_message_id': src_message['message_id'],
                                   'dst_message_id': dst_message['message_id']})
 
-    def post_usage_message(self, message, usage):
+    def post_usagelink_message(self, message, usage):
         return self.post_link_message(
             'linkisusage',
             self.post_link_message('usagelink', message, usage),
             self.get_message_by_expr(["system", "usage"]))
 
     def post_typelink_message(self, message, type):
-        return self.post_usage_message(
+        return self.post_usagelink_message(
             self.post_link_message('typelink', message, type),
             self.get_message_by_expr(["system", "type"]))
 
     def post_subtypelink_message(self, type, parent_type):
-        self.post_usage_message(
+        self.post_usagelink_message(
             self.post_link_message('subtypelink', type, parent_type),
             self.get_message_by_expr(["system", "subtype"]))
 
