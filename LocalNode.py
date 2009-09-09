@@ -311,7 +311,7 @@ class ExprNode(Node.Node):
             froms.extend(froms1)
             wheres.extend(wheres1)
             params.extend(params1)
-        return (froms, wheres, params)
+        return froms, wheres, params
 
     def _message_expr_to_sql_and(self, expr, prev, info, data): 
         return self._message_expr_to_sqlhelper_sequence(expr[1:], [prev] * len(expr[1:]), info)
@@ -319,7 +319,7 @@ class ExprNode(Node.Node):
     def _message_expr_to_sql_or(self, expr, prev, info, data): 
         froms, wheres, params = self._message_expr_to_sqlhelper_sequence(expr[1:], [prev] * len(expr[1:]), info)
         wheres = ['(%s)' % (' or '.join(wheres),)]
-        return (froms, wheres, params)
+        return froms, wheres, params
 
     def _message_expr_to_sql_inv(self, expr, prev, info, data):
         info['alias'] += 1
@@ -334,7 +334,17 @@ class ExprNode(Node.Node):
             prev, info)
 
     def _message_expr_to_sql_id(self, expr, prev, info, data): 
-        return ([], ["%(prev)s = %(param)s" % data], [expr[1]])
+        return [], ["%(prev)s = %(param)s" % data], [expr[1]]
+
+    def _message_expr_to_sql_content(self, expr, prev, info, data): 
+        info['alias'] += 1
+
+        froms = ["message as a%(alias_id)s" % data]
+        wheres = ["""(    a%(alias_id)s.node_id = %(node_id)s
+                      and a%(alias_id)s.content = %(param)s
+                      and a%(alias_id)s.message_id = %(prev)s)""" % data]
+        params = [expr[1]]
+        return froms, wheres, params
 
     def _message_expr_to_sql_anno(self, expr, prev, info, data): 
         info['alias'] += 1
@@ -346,7 +356,7 @@ class ExprNode(Node.Node):
                       and a%(alias_id)s.message_id = %(prev)s
                       and a%(alias_id)s.peer_id is null)""" % data]
         params = [expr[1], expr[2]]
-        return (froms, wheres, params)
+        return froms, wheres, params
 
     def _message_expr_to_sql_linksto(self, expr, prev, info, data): 
         info['alias'] += 1
@@ -357,7 +367,7 @@ class ExprNode(Node.Node):
         froms.append("message_link as a%(alias_id)s" % data)
         wheres.append("""(    a%(alias_id)s.node_id = %(node_id)s
                           and a%(alias_id)s.src_message_id = %(prev)s)""" % data)
-        return (froms, wheres, params)
+        return froms, wheres, params
     
     def _message_expr_to_sql_linkedfrom(self, expr, prev, info, data): 
         return self._message_expr_to_sql(
@@ -430,6 +440,18 @@ class ExprNode(Node.Node):
         return self._message_expr_to_sql(
             ["inv", "basetypeis", expr[1]],
             prev, info)
+
+    def _message_expr_to_sql_dir(self, expr, prev, info, data):
+        if not expr[1]:
+            return expr[2]
+        return self._message_expr_to_sql(
+            ["linkstovia",
+             ["and",
+              ["usageis", ["system", "directorylink"]],
+              ["content", expr[1][0]],
+             self._message_expr_to_sql(["dir", expr[1][1:], expr[2]], prev, info)],
+            prev, info)
+
 
 class UINode(ExprNode):
     def set_annotation(self, name, value, message = None, peer = None):

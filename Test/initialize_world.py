@@ -36,11 +36,13 @@ n0.post_subtypelink_message(n0.get_message_by_expr(["system", "usage"]),
 n0.post_subtypelink_message(n0.get_message_by_expr(["system", "subtype"]),
                             n0.get_message_by_expr(["system", "usage"]))
 
+createtype(n0, 'directorylink', n0.get_message_by_expr(["system", "usage"]))
+createtype(n0, 'directorynode', n0.get_message_by_expr(["system", "type"]))
+createtype(n0, 'directorycontentlink', n0.get_message_by_expr(["system", "usage"]))
+
 createtype(n0, 'text', n0.get_message_by_expr(["system", "type"]))
 createtype(n0, 'xml', n0.get_message_by_expr(["system", "text"]))
 createtype(n0, 'xhtml', n0.get_message_by_expr(["system", "xml"]))
 createtype(n0, 'css', n0.get_message_by_expr(["system", "text"]))
-
-createtype(n0, 'searchtreesubnode', n0.get_message_by_expr(["system", "usage"]))
 
 n0.commit()
