@@ -16,17 +16,31 @@ def create(n, name):
 def createtype(n, name, parent):
     res = create(n, name)
     n.post_typelink_message(res, n.get_message_by_expr(["system", "type"]))
-    n.post_subtypelink_message(res, n.get_message_by_expr(["system", "type"]))
+    n.post_subtypelink_message(res, parent)
     return res
 
 
 create(n0, 'usage')
 create(n0, 'type')
-n0.post_typelink_message(n0.get_message_by_expr(["system", "type"]), n0.get_message_by_expr(["system", "type"]))
 create(n0, 'subtype')
+
+n0.post_typelink_message(n0.get_message_by_expr(["system", "type"]),
+                         n0.get_message_by_expr(["system", "type"]))
+n0.post_typelink_message(n0.get_message_by_expr(["system", "usage"]),
+                         n0.get_message_by_expr(["system", "type"]))
+n0.post_typelink_message(n0.get_message_by_expr(["system", "subtype"]),
+                         n0.get_message_by_expr(["system", "type"]))
+
+n0.post_subtypelink_message(n0.get_message_by_expr(["system", "usage"]),
+                            n0.get_message_by_expr(["system", "type"]))
+n0.post_subtypelink_message(n0.get_message_by_expr(["system", "subtype"]),
+                            n0.get_message_by_expr(["system", "usage"]))
+
 createtype(n0, 'text', n0.get_message_by_expr(["system", "type"]))
 createtype(n0, 'xml', n0.get_message_by_expr(["system", "text"]))
 createtype(n0, 'xhtml', n0.get_message_by_expr(["system", "xml"]))
 createtype(n0, 'css', n0.get_message_by_expr(["system", "text"]))
+
+createtype(n0, 'searchtreesubnode', n0.get_message_by_expr(["system", "usage"]))
 
 n0.commit()

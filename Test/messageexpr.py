@@ -19,7 +19,11 @@ for expr in [
 
     ["and",
      ["system", "xml"],
-     ["basetypeis", ["system", "text"]]]
+     ["basetypeis", ["system", "text"]]],
+
+    ["and",
+     ["system", "subtype"],
+     ["basetypeis", ["system", "usage"]]],
 
     ]:
     print "================================"
