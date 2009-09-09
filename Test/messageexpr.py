@@ -18,12 +18,16 @@ for expr in [
        ["linksto", ["linksto", ["var", "x"]]]]]],
 
     ["and",
-     ["system", "xml"],
-     ["basetypeis", ["system", "text"]]],
+     ["system", "usage"],
+     ["basetypeis", ["system", "type"]]],
 
     ["and",
      ["system", "subtype"],
      ["basetypeis", ["system", "usage"]]],
+
+    ["and",
+     ["system", "xml"],
+     ["basetypeis", ["system", "text"]]],
 
     ]:
     print "================================"
