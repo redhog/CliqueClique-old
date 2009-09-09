@@ -389,8 +389,8 @@ class ExprNode(Node.Node):
              ["ignore",
               ["and",
                [expr[1],
-                ["var", data['alias_id']]],
-               expr[2]]]],
+                ["var", data['alias_id']]] + expr[2:-1],
+               expr[-1]]]],
             prev, info)
 
     def _message_expr_to_sql_id(self, expr, prev, info, data): 
@@ -424,40 +424,42 @@ class ExprNode(Node.Node):
             ["inv", "linksto", expr[1]],
             prev, info)
 
-#     def _message_expr_to_sql_linkstovia(self, expr, prev, info, data): 
-#         return self._message_expr_to_sql_and(
-#             ["linksto",
-#              ["and",
-#               arg[1],
-#               ["linksto", arg[2]]]],
-#             prev, info)
+    def _message_expr_to_sql_linkstovia(self, expr, prev, info, data): 
+        return self._message_expr_to_sql_and(
+            ["linksto",
+             ["and",
+              arg[1],
+              ["linksto", arg[2]]]],
+            prev, info)
 
-#     def _message_expr_to_sql_linkedfromvia(self, expr, prev, info, data): 
-#         return self._message_expr_to_sql_and(
-#             ["linkedfrom",
-#              ["and",
-#               arg[1],
-#               ["linkedfrom", arg[2]]]],
-#             prev, info)
+    def _message_expr_to_sql_linkedfromvia(self, expr, prev, info, data): 
+        return self._message_expr_to_sql_and(
+            ["inv", "linkstovia", expr[1], expr[2]],
+            prev, info)
 
-#     def _message_expr_to_sql_usageis(self, expr, prev, info, data): 
-#         return self._message_expr_to_sql_and(
-#             ["linkstovia",
-#              ["anno"
-#               "global_attribute_cache",
-#               "/system/usage"],
-#              arg[1]],
-#             prev, info)
+    def _message_expr_to_sql_usageis(self, expr, prev, info, data): 
+        return self._message_expr_to_sql_and(
+            ["linkstovia",
+             ["anno"
+              "global_attribute_cache",
+              "/system/usage"],
+             expr[1]],
+            prev, info)
 
-#     def _message_expr_to_sql_usageis(self, expr, prev, info, data): 
-#         return self._message_expr_to_sql_and(
-#             ["linkstovia",
-#              ["anno"
-#               "global_attribute_cache",
-#               "/system/usage"],
-#              arg[1]],
-#             prev, info)
+    def _message_expr_to_sql_isusage(self, expr, prev, info, data): 
+        return self._message_expr_to_sql_and(
+            ["inv", "usageis", expr[1]],
+            prev, info)
 
+    def _message_expr_to_sql_typeis(self, expr, prev, info, data): 
+        return self._message_expr_to_sql_and(
+            ["linkstovia",
+             ["usageis",
+              ["anno"
+               "global_attribute_cache",
+               "/system/type"]],
+             expr[1]],
+            prev, info)
 
 class LocalNode(ThreadSyncNode, IntrospectionNode, UINode, ExprNode):
     pass
