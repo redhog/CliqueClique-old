@@ -13,35 +13,39 @@ def create(n, name):
     n.set_annotation("global_attribute_cache", "/system/%s" % name, res)
     return res
 
-musage = create(n0, 'usage')
+create(n0, 'usage')
 def setusage(n, m, u):
     return n.post_link_message(
-        'linkisusage', n.post_link_message('usagelink', m, u), musage)
+        'linkisusage', n.post_link_message('usagelink', m, u),
+        n.get_message_by_expr(["system", "usage"]))
 
-mtype = create(n0, 'type')
+create(n0, 'type')
 def settype(n, m, t):
     setusage(
         n,
         n.post_link_message('typelink', m, t),
-        mtype)
-settype(n0, mtype, mtype)
+        n.get_message_by_expr(["system", "type"]))
+settype(
+    n0,
+    n0.get_message_by_expr(["system", "type"]),
+    n0.get_message_by_expr(["system", "type"]))
 
-msubtype = create(n0, 'subtype')
+create(n0, 'subtype')
 def setsubtype(n, t, p):
     setusage(
         n,
         n.post_link_message('subtypelink', t, p),
-        msubtype)
+        n.get_message_by_expr(["system", "subtype"]))
 
 def createtype(n, name, parent):
     res = create(n, name)
-    settype(n, res, mtype)
+    settype(n, res, n.get_message_by_expr(["system", "type"]))
     setsubtype(n, res, parent)
     return res
 
-mtypetext = createtype(n0, 'text', mtype)
-mtypexml = createtype(n0, 'xml', mtypetext)
-mtypexhtml = createtype(n0, 'xhtml', mtypexml)
-mtypecss = createtype(n0, 'css', mtypetext)
+createtype(n0, 'text', n0.get_message_by_expr(["system", "type"]))
+createtype(n0, 'xml', n0.get_message_by_expr(["system", "text"]))
+createtype(n0, 'xhtml', n0.get_message_by_expr(["system", "xml"]))
+createtype(n0, 'css', n0.get_message_by_expr(["system", "text"]))
 
 n0.commit()
