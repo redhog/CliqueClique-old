@@ -262,62 +262,6 @@ class IntrospectionNode(Node.Node):
     def _get_message_links(self, **kw):
         return Tables.MessageLink.select_objs(self._conn, node_id = self.get_local_node()['node_id'], **kw)
 
-
-class UINode(Node.Node):
-    def set_annotation(self, name, value, message = None, peer = None):
-        Tables.Annotation.create_or_update(
-            self._conn,
-            {'node_id': self.node_id,
-             'name': name,
-             'message_id': message and message['message_id'] or None,
-             'peer_id': peer and peer['peer_id'] or None,
-             'value': value})
-        
-    def get_annotation(self, name, message = None, peer = None):
-        return Tables.Annotation.select_obj(
-            self._conn, self.node_id,
-            name,
-            message and message['message_id'] or None,
-            peer and peer['peer_id'] or None)['value']
-
-    def post_message(self, message):
-        message['message_id'] = self.calculate_message_id(message)
-        message['message_challenge_id'] = self.calculate_message_challenge_id(message)
-        self._register_message(message)
-        self.update_local_subscription(message)
-        return message
-
-    def update_local_subscription(self, message, subscribed = 1):
-        subscription = Tables.Subscription.select_obj(self._conn, node_id = self.get_local_node()['node_id'], peer_id = self.get_local_node()['node_id'], message_id = message['message_id'])
-        if subscription is None:
-            subscription = {'peer_id': self.get_local_node()['node_id'],
-                            'message_id': message['message_id'],
-                            'local_is_subscribed': 1,
-                            'local_center_node_is_subscribed': 1,
-                            'local_center_node_id': self.get_local_node()['node_id'],
-                            'local_center_distance': 1,
-                            'remote_is_subscribed': 1,
-                            'remote_center_node_is_subscribed': 1,
-                            'remote_center_node_id': self.get_local_node()['node_id'],
-                            'remote_center_distance': 0}
-        subscription['remote_is_subscribed'] = subscribed
-        subscription['remote_center_node_is_subscribed'] = subscribed
-        self.update_subscription(subscription)
-
-    def delete_local_subscription(self, message):
-        subscription = Tables.Subscription.select_obj(self._conn, node_id = self.get_local_node()['node_id'], peer_id = self.get_local_node()['node_id'], message_id = message['message_id'])
-        if subscription is not None:
-            self.delete_subscription(subscription)
-
-    def post_text_message(self, content):
-        return self.post_message({'content': content})
-
-    def post_link_message(self, link_description, src_message, dst_message):
-        return self.post_message({'content': link_description,
-                                  'src_message_id': src_message['message_id'],
-                                  'dst_message_id': dst_message['message_id']})
-
-
 class ExprNode(Node.Node):
     def get_message_by_expr(self, expr):
         with self.get_messages_by_expr(expr) as msgs:
@@ -487,7 +431,75 @@ class ExprNode(Node.Node):
             ["inv", "basetypeis", expr[1]],
             prev, info)
 
+class UINode(ExprNode):
+    def set_annotation(self, name, value, message = None, peer = None):
+        Tables.Annotation.create_or_update(
+            self._conn,
+            {'node_id': self.node_id,
+             'name': name,
+             'message_id': message and message['message_id'] or None,
+             'peer_id': peer and peer['peer_id'] or None,
+             'value': value})
+        
+    def get_annotation(self, name, message = None, peer = None):
+        return Tables.Annotation.select_obj(
+            self._conn, self.node_id,
+            name,
+            message and message['message_id'] or None,
+            peer and peer['peer_id'] or None)['value']
 
+    def post_message(self, message):
+        message['message_id'] = self.calculate_message_id(message)
+        message['message_challenge_id'] = self.calculate_message_challenge_id(message)
+        self._register_message(message)
+        self.update_local_subscription(message)
+        return message
 
-class LocalNode(ThreadSyncNode, IntrospectionNode, UINode, ExprNode):
+    def update_local_subscription(self, message, subscribed = 1):
+        subscription = Tables.Subscription.select_obj(self._conn, node_id = self.get_local_node()['node_id'], peer_id = self.get_local_node()['node_id'], message_id = message['message_id'])
+        if subscription is None:
+            subscription = {'peer_id': self.get_local_node()['node_id'],
+                            'message_id': message['message_id'],
+                            'local_is_subscribed': 1,
+                            'local_center_node_is_subscribed': 1,
+                            'local_center_node_id': self.get_local_node()['node_id'],
+                            'local_center_distance': 1,
+                            'remote_is_subscribed': 1,
+                            'remote_center_node_is_subscribed': 1,
+                            'remote_center_node_id': self.get_local_node()['node_id'],
+                            'remote_center_distance': 0}
+        subscription['remote_is_subscribed'] = subscribed
+        subscription['remote_center_node_is_subscribed'] = subscribed
+        self.update_subscription(subscription)
+
+    def delete_local_subscription(self, message):
+        subscription = Tables.Subscription.select_obj(self._conn, node_id = self.get_local_node()['node_id'], peer_id = self.get_local_node()['node_id'], message_id = message['message_id'])
+        if subscription is not None:
+            self.delete_subscription(subscription)
+
+    def post_text_message(self, content):
+        return self.post_message({'content': content})
+
+    def post_link_message(self, link_description, src_message, dst_message):
+        return self.post_message({'content': link_description,
+                                  'src_message_id': src_message['message_id'],
+                                  'dst_message_id': dst_message['message_id']})
+
+    def post_usage_message(self, message, usage):
+        return self.post_link_message(
+            'linkisusage',
+            self.post_link_message('usagelink', message, usage),
+            self.get_message_by_expr(["system", "usage"]))
+
+    def post_typelink_message(self, message, type):
+        return self.post_usage_message(
+            self.post_link_message('typelink', message, type),
+            self.get_message_by_expr(["system", "type"]))
+
+    def post_subtypelink_message(self, type, parent_type):
+        self.post_usage_message(
+            self.post_link_message('subtypelink', type, parent_type),
+            self.get_message_by_expr(["system", "subtype"]))
+
+class LocalNode(ThreadSyncNode, IntrospectionNode, UINode):
     pass

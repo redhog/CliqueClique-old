@@ -13,33 +13,16 @@ def create(n, name):
     n.set_annotation("global_attribute_cache", "/system/%s" % name, res)
     return res
 
-def setusage(n, m, u):
-    return n.post_link_message(
-        'linkisusage', n.post_link_message('usagelink', m, u),
-        n.get_message_by_expr(["system", "usage"]))
-
-def settype(n, m, t):
-    setusage(
-        n,
-        n.post_link_message('typelink', m, t),
-        n.get_message_by_expr(["system", "type"]))
-
-def setsubtype(n, t, p):
-    setusage(
-        n,
-        n.post_link_message('subtypelink', t, p),
-        n.get_message_by_expr(["system", "subtype"]))
-
 def createtype(n, name, parent):
     res = create(n, name)
-    settype(n, res, n.get_message_by_expr(["system", "type"]))
-    setsubtype(n, res, parent)
+    n.post_typelink_message(res, n.get_message_by_expr(["system", "type"]))
+    n.post_subtypelink_message(res, n.get_message_by_expr(["system", "type"]))
     return res
 
 
 create(n0, 'usage')
 create(n0, 'type')
-settype(n0, n0.get_message_by_expr(["system", "type"]), n0.get_message_by_expr(["system", "type"]))
+n0.post_typelink_message(n0.get_message_by_expr(["system", "type"]), n0.get_message_by_expr(["system", "type"]))
 create(n0, 'subtype')
 createtype(n0, 'text', n0.get_message_by_expr(["system", "type"]))
 createtype(n0, 'xml', n0.get_message_by_expr(["system", "text"]))
