@@ -13,24 +13,17 @@ def create(n, name):
     n.set_annotation("global_attribute_cache", "/system/%s" % name, res)
     return res
 
-create(n0, 'usage')
 def setusage(n, m, u):
     return n.post_link_message(
         'linkisusage', n.post_link_message('usagelink', m, u),
         n.get_message_by_expr(["system", "usage"]))
 
-create(n0, 'type')
 def settype(n, m, t):
     setusage(
         n,
         n.post_link_message('typelink', m, t),
         n.get_message_by_expr(["system", "type"]))
-settype(
-    n0,
-    n0.get_message_by_expr(["system", "type"]),
-    n0.get_message_by_expr(["system", "type"]))
 
-create(n0, 'subtype')
 def setsubtype(n, t, p):
     setusage(
         n,
@@ -43,6 +36,11 @@ def createtype(n, name, parent):
     setsubtype(n, res, parent)
     return res
 
+
+create(n0, 'usage')
+create(n0, 'type')
+settype(n0, n0.get_message_by_expr(["system", "type"]), n0.get_message_by_expr(["system", "type"]))
+create(n0, 'subtype')
 createtype(n0, 'text', n0.get_message_by_expr(["system", "type"]))
 createtype(n0, 'xml', n0.get_message_by_expr(["system", "text"]))
 createtype(n0, 'xhtml', n0.get_message_by_expr(["system", "xml"]))

@@ -16,8 +16,10 @@ for expr in [
       ["and",
        ["id", n0.s2id("49f02f1a9fb8d9172fa7316a08eaab50")],
        ["linksto", ["linksto", ["var", "x"]]]]]],
-    
-    ["basetypeis", ["system", "text"]]
+
+    ["and",
+     ["system", "xml"],
+     ["basetypeis", ["system", "text"]]]
 
     ]:
     print "================================"
