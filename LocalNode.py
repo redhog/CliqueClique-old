@@ -358,26 +358,22 @@ class ExprNode(Node.Node):
         params.append(self.node_id)
         return froms, wheres, params
 
-    def _message_expr_to_sql_and(self, expr, prev, info, data): 
+    def _message_expr_to_sqlhelper_sequence(self, exprs, prevs, info): 
         froms = []
         wheres = []
         params = []
-        for arg in expr[1:]:
+        for arg, prev in zip(exprs, prevs):
             froms1, wheres1, params1 = self._message_expr_to_sql(arg, prev, info)
             froms.extend(froms1)
             wheres.extend(wheres1)
             params.extend(params1)
         return (froms, wheres, params)
 
+    def _message_expr_to_sql_and(self, expr, prev, info, data): 
+        return self._message_expr_to_sqlhelper_sequence(expr[1:], [prev] * len(expr[1:]), info)
+
     def _message_expr_to_sql_or(self, expr, prev, info, data): 
-        froms = []
-        wheres = []
-        params = []
-        for arg in expr[1:]:
-            froms1, wheres1, params1 = self._message_expr_to_sql(arg, prev, info)
-            froms.extend(froms1)
-            wheres.extend(wheres1)
-            params.extend(params1)
+        froms, wheres, params = self._message_expr_to_sqlhelper_sequence(expr[1:], [prev] * len(expr[1:]), info)
         wheres = ['(%s)' % (' or '.join(wheres),)]
         return (froms, wheres, params)
 
@@ -425,12 +421,16 @@ class ExprNode(Node.Node):
             prev, info)
 
     def _message_expr_to_sql_linkstovia(self, expr, prev, info, data): 
-        return self._message_expr_to_sql(
-            ["linksto",
-             ["and",
-              expr[1],
-              ["linksto", expr[2]]]],
-            prev, info)
+        info['alias'] += 2
+        froms, wheres, params = self._message_expr_to_sqlhelper_sequence(
+            expr[1:],
+            ["a%(alias_id)s.message_id" % data,
+             "a%(alias_id)s.dst_message_id" % data],
+            info)
+        froms.append("message as a%(alias_id)s" % data)
+        wheres.append("""(    a%(alias_id)s.node_id = %(node_id)s
+                          and a%(alias_id)s.src_message_id = %(prev)s)""" % data)
+        return froms, wheres, params
 
     def _message_expr_to_sql_linkedfromvia(self, expr, prev, info, data): 
         return self._message_expr_to_sql(
@@ -471,6 +471,23 @@ class ExprNode(Node.Node):
         return self._message_expr_to_sql(
             ["inv", "typeis", expr[1]],
             prev, info)
+
+    def _message_expr_to_sql_subtypelink(self, expr, prev, info, data):
+        return self._message_expr_to_sql(
+            ["usageis", ["system", "subtype"]],
+            prev, info)
+    
+    def _message_expr_to_sql_basetypeis(self, expr, prev, info, data): 
+        return self._message_expr_to_sql(
+            ["linkstovia", ["subtypelink"], expr[1]],
+            prev, info)
+
+    def _message_expr_to_sql_isbasetype(self, expr, prev, info, data): 
+        return self._message_expr_to_sql(
+            ["inv", "basetypeis", expr[1]],
+            prev, info)
+
+
 
 class LocalNode(ThreadSyncNode, IntrospectionNode, UINode, ExprNode):
     pass
