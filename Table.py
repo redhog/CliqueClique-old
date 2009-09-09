@@ -1,7 +1,7 @@
 from __future__ import with_statement
 import contextlib, sys
 
-debug_selects = False
+debug_selects = True
 
 class Table(object):
     table_name = None

@@ -23,6 +23,9 @@ create table message (
  dst_message_id numeric,
  primary key (node_id, message_id)
 );
+create index message_message_id on message (message_id);
+create index message_src_message_id on message (src_message_id);
+create index message_dst_message_id on message (dst_message_id);
 
 create table subscription (
  node_id numeric,
