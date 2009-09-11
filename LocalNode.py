@@ -440,17 +440,27 @@ class ExprNode(Node.Node):
         return self._message_expr_to_sql(
             ["inv", "basetypeis", expr[1]],
             prev, info)
+    
+    def _message_expr_to_sql_dirlink(self, expr, prev, info, data):
+        return self._message_expr_to_sql(
+            ["usageis", ["system", "dirlink"]],
+            prev, info)
+
+    def _message_expr_to_sql_dirlinks(self, expr, prev, info, data):
+        return self._message_expr_to_sql(
+            ["linkstovia", ["and", ["dirlink"], expr[1]], expr[2]],
+            prev, info)
+
+    def _message_expr_to_sql_dirlinked(self, expr, prev, info, data):
+        return self._message_expr_to_sql(
+            ["inv", "dirlinks", expr[1], expr[2]],
+            prev, info)
 
     def _message_expr_to_sql_dir(self, expr, prev, info, data):
-        if not expr[1]:
-            return expr[2]
-        return self._message_expr_to_sql(
-            ["linkstovia",
-             ["and",
-              ["usageis", ["system", "directorylink"]],
-              ["content", expr[1][0]],
-             self._message_expr_to_sql(["dir", expr[1][1:], expr[2]], prev, info)],
-            prev, info)
+        res = expr[2]
+        for char in expr[1]:
+            res = ["dirlinked", ["content", char], res]
+        return self._message_expr_to_sql(res, prev, info)
 
 
 class UINode(ExprNode):
@@ -469,13 +479,6 @@ class UINode(ExprNode):
             name,
             message and message['message_id'] or None,
             peer and peer['peer_id'] or None)['value']
-
-    def post_message(self, message):
-        message['message_id'] = self.calculate_message_id(message)
-        message['message_challenge_id'] = self.calculate_message_challenge_id(message)
-        self._register_message(message)
-        self.update_local_subscription(message)
-        return message
 
     def update_local_subscription(self, message, subscribed = 1):
         subscription = Tables.Subscription.select_obj(self._conn, node_id = self.get_local_node()['node_id'], peer_id = self.get_local_node()['node_id'], message_id = message['message_id'])
@@ -499,6 +502,13 @@ class UINode(ExprNode):
         if subscription is not None:
             self.delete_subscription(subscription)
 
+    def post_message(self, message):
+        message['message_id'] = self.calculate_message_id(message)
+        message['message_challenge_id'] = self.calculate_message_challenge_id(message)
+        self._register_message(message)
+        self.update_local_subscription(message)
+        return message
+
     def post_text_message(self, content):
         return self.post_message({'content': content})
 
@@ -513,15 +523,63 @@ class UINode(ExprNode):
             self.post_link_message('usagelink', message, usage),
             self.get_message_by_expr(["system", "usage"]))
 
+    def post_usaged_link_message(self, link_description, src_message, dst_message, usage):
+        link = self.post_link_message(link_description, src_message, dst_message)
+        self.post_usagelink_message(link, usage)
+        return link
+
     def post_typelink_message(self, message, type):
         return self.post_usagelink_message(
             self.post_link_message('typelink', message, type),
             self.get_message_by_expr(["system", "type"]))
 
+    def post_typed_text_message(self, content, type):
+        message = self.post_text_message(content)
+        self.post_typelink_message(message, type)
+        return message
+
     def post_subtypelink_message(self, type, parent_type):
-        self.post_usagelink_message(
-            self.post_link_message('subtypelink', type, parent_type),
+        return self.post_usaged_link_message(
+            'subtypelink', type, parent_type,
             self.get_message_by_expr(["system", "subtype"]))
 
+    def get_existing_dir_prefix(self, root, path):
+        #FIXME: Use binary search here to speed things up!
+        existing_path = path
+        node = self.get_message_by_expr(["dir", existing_path, root])
+        while not node and existing_path:
+            existing_path = existing_path[:-1]
+            node = self.get_message_by_expr(["dir", existing_path, root])
+        return node, path[len(existing_path):]
+
+    def post_dirlink_message(self, parent, char, child):
+        return self.post_usaged_link_message(
+            char, parent, child,
+            self.get_message_by_expr(["system", "dirlink"]))
+
+    def post_dirnode_message(self):
+        return self.post_typed_text_message(
+            'dirnode',
+            self.get_message_by_expr(["system", "dirnode"]))
+
+    def post_dircontentlink_message(self, dirnode, message):
+        return self.post_usaged_link_message(
+            'dircontentlink', dirnode, message,
+            self.get_message_by_expr(["system", "dircontentlink"]))
+
+    def post_dirlevel_message(self, existing, char):
+        node = self.post_dirnode_message()
+        self.post_dirlink_message(existing, char, node),
+        return node
+
+    def post_direntry_message(self, root, path, message):
+       existing, rest_path = self.get_existing_dir_prefix(root, path)
+       self.update_local_subscription(existing)
+       for char in rest_path:
+           existing = self.post_dirlevel_message(existing, char)
+       return self.post_dircontentlink_message(existing, message)
+
+        
+    
 class LocalNode(ThreadSyncNode, IntrospectionNode, UINode):
     pass

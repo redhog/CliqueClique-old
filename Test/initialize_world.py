@@ -8,14 +8,18 @@ h = Host.Host()
 h.initialize()
 n0 = h.get_node(Node.NodeOperations.s2id(node_num_to_id(0)))
 
+def setanno(n, name, message):
+    n.set_annotation("global_attribute_cache", "/system/%s" % name, message)
+    return message
+
 def create(n, name):
-    res = n.post_text_message(name)
-    n.set_annotation("global_attribute_cache", "/system/%s" % name, res)
-    return res
+    return setanno(n, name, n.post_text_message(name))
+
+def createtyped(n, name, type):
+    return setanno(n, name, n.post_typed_text_message(name, type))
 
 def createtype(n, name, parent):
-    res = create(n, name)
-    n.post_typelink_message(res, n.get_message_by_expr(["system", "type"]))
+    res = createtyped(n, name, n.get_message_by_expr(["system", "type"]))
     n.post_subtypelink_message(res, parent)
     return res
 
@@ -36,13 +40,15 @@ n0.post_subtypelink_message(n0.get_message_by_expr(["system", "usage"]),
 n0.post_subtypelink_message(n0.get_message_by_expr(["system", "subtype"]),
                             n0.get_message_by_expr(["system", "usage"]))
 
-createtype(n0, 'directorylink', n0.get_message_by_expr(["system", "usage"]))
-createtype(n0, 'directorynode', n0.get_message_by_expr(["system", "type"]))
-createtype(n0, 'directorycontentlink', n0.get_message_by_expr(["system", "usage"]))
+createtype(n0, 'dirlink', n0.get_message_by_expr(["system", "usage"]))
+createtype(n0, 'dirnode', n0.get_message_by_expr(["system", "type"]))
+createtype(n0, 'dircontentlink', n0.get_message_by_expr(["system", "usage"]))
 
 createtype(n0, 'text', n0.get_message_by_expr(["system", "type"]))
 createtype(n0, 'xml', n0.get_message_by_expr(["system", "text"]))
 createtype(n0, 'xhtml', n0.get_message_by_expr(["system", "xml"]))
 createtype(n0, 'css', n0.get_message_by_expr(["system", "text"]))
+
+setanno(n0, 'rootdir', n0.post_dirnode_message())
 
 n0.commit()
