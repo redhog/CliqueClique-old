@@ -29,6 +29,7 @@ for expr in [
      ["system", "xml"],
      ["basetypeis", ["system", "text"]]],
 
+    ["system", "dirnode"],
     ]:
     print "================================"
     print expr

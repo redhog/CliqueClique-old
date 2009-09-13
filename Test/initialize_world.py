@@ -40,15 +40,15 @@ n0.post_subtypelink_message(n0.get_message_by_expr(["system", "usage"]),
 n0.post_subtypelink_message(n0.get_message_by_expr(["system", "subtype"]),
                             n0.get_message_by_expr(["system", "usage"]))
 
-createtype(n0, 'dirlink', n0.get_message_by_expr(["system", "usage"]))
-createtype(n0, 'dirnode', n0.get_message_by_expr(["system", "type"]))
-createtype(n0, 'dircontentlink', n0.get_message_by_expr(["system", "usage"]))
+createtype(n0, 'nametreelink', n0.get_message_by_expr(["system", "usage"]))
+createtype(n0, 'nametreenode', n0.get_message_by_expr(["system", "type"]))
+createtype(n0, 'nametreeleaflink', n0.get_message_by_expr(["system", "usage"]))
 
 createtype(n0, 'text', n0.get_message_by_expr(["system", "type"]))
 createtype(n0, 'xml', n0.get_message_by_expr(["system", "text"]))
 createtype(n0, 'xhtml', n0.get_message_by_expr(["system", "xml"]))
 createtype(n0, 'css', n0.get_message_by_expr(["system", "text"]))
 
-setanno(n0, 'rootdir', n0.post_dirnode_message())
+setanno(n0, 'rootdir', n0.post_nametreeroot_message('root'))
 
 n0.commit()

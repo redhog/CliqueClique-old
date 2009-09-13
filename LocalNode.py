@@ -281,8 +281,11 @@ class ExprNode(Node.Node):
                 "prev": prev,
                 "param": Tables.Message._paramstyle_from_conn(self._conn)}
         if not expr:
-            return self._message_expr_to_sql_all(expr, prev, info, data)
-        return getattr(self, "_message_expr_to_sql_" + expr[0])(expr, prev, info, data)
+            return self._message_expr_to_sql(['all'], prev, info)
+        elif isinstance(expr, dict):
+            return self._message_expr_to_sql(['id', expr['message_id']], prev, info)
+        else:
+            return getattr(self, "_message_expr_to_sql_" + expr[0])(expr, prev, info, data)
 
     def _message_expr_to_sql_all(self, expr, prev, info, data):
         return ([], [], [])
@@ -328,8 +331,7 @@ class ExprNode(Node.Node):
              ["var", data['alias_id']],
              ["ignore",
               ["and",
-               [expr[1],
-                ["var", data['alias_id']]] + expr[2:-1],
+               expr[1:-1] + [["var", data['alias_id']]],
                expr[-1]]]],
             prev, info)
 
@@ -441,45 +443,50 @@ class ExprNode(Node.Node):
             ["inv", "basetypeis", expr[1]],
             prev, info)
     
-    def _message_expr_to_sql_dirlink(self, expr, prev, info, data):
+    def _message_expr_to_sql_nametreelink(self, expr, prev, info, data):
         return self._message_expr_to_sql(
-            ["usageis", ["system", "dirlink"]],
+            ["usageis", ["system", "nametreelink"]],
             prev, info)
 
-    def _message_expr_to_sql_dirlinks(self, expr, prev, info, data):
+    def _message_expr_to_sql_nametreelinks(self, expr, prev, info, data):
         return self._message_expr_to_sql(
-            ["linkstovia", ["and", ["dirlink"], expr[1]], expr[2]],
+            ["linkstovia", ["and", ["nametreelink"], expr[1]], expr[2]],
             prev, info)
 
-    def _message_expr_to_sql_dirlinked(self, expr, prev, info, data):
+    def _message_expr_to_sql_nametreelinked(self, expr, prev, info, data):
         return self._message_expr_to_sql(
-            ["inv", "dirlinks", expr[1], expr[2]],
+            ["inv", "nametreelinks", expr[1], expr[2]],
             prev, info)
 
-    def _message_expr_to_sql_dir(self, expr, prev, info, data):
+    def _message_expr_to_sql_nametreelookup(self, expr, prev, info, data):
         res = expr[2]
         for char in expr[1]:
-            res = ["dirlinked", ["content", char], res]
+            res = ["nametreelinked", ["content", char], res]
+        return self._message_expr_to_sql(res, prev, info)
+    
+    def _message_expr_to_sql_nametreeleaflink(self, expr, prev, info, data):
+        return self._message_expr_to_sql(
+            ["usageis", ["system", "nametreeleaflink"]],
+            prev, info)
+
+    def _message_expr_to_sql_nametreeleaflinks(self, expr, prev, info, data):
+        return self._message_expr_to_sql(
+            ["linkstovia", ["and", ["nametreeleaflink"], expr[1]], expr[2]],
+            prev, info)
+
+    def _message_expr_to_sql_nametreeleaflinked(self, expr, prev, info, data):
+        return self._message_expr_to_sql(
+            ["inv", "nametreeleaflinks", expr[1], expr[2]],
+            prev, info)
+    
+    def _message_expr_to_sql_cd(self, expr, prev, info, data):
+        res = expr[2]
+        for entry in expr[1]:
+            res = ['nametreeleaflinked', [], ['nametreelookup', entry, res]]
         return self._message_expr_to_sql(res, prev, info)
 
-
-class UINode(ExprNode):
-    def set_annotation(self, name, value, message = None, peer = None):
-        Tables.Annotation.create_or_update(
-            self._conn,
-            {'node_id': self.node_id,
-             'name': name,
-             'message_id': message and message['message_id'] or None,
-             'peer_id': peer and peer['peer_id'] or None,
-             'value': value})
-        
-    def get_annotation(self, name, message = None, peer = None):
-        return Tables.Annotation.select_obj(
-            self._conn, self.node_id,
-            name,
-            message and message['message_id'] or None,
-            peer and peer['peer_id'] or None)['value']
-
+    
+class SubscriptionNode(ExprNode):
     def update_local_subscription(self, message, subscribed = 1):
         subscription = Tables.Subscription.select_obj(self._conn, node_id = self.get_local_node()['node_id'], peer_id = self.get_local_node()['node_id'], message_id = message['message_id'])
         if subscription is None:
@@ -502,6 +509,26 @@ class UINode(ExprNode):
         if subscription is not None:
             self.delete_subscription(subscription)
 
+
+class AnnotationNode(Node.Node):
+    def set_annotation(self, name, value, message = None, peer = None):
+        Tables.Annotation.create_or_update(
+            self._conn,
+            {'node_id': self.node_id,
+             'name': name,
+             'message_id': message and message['message_id'] or None,
+             'peer_id': peer and peer['peer_id'] or None,
+             'value': value})
+        
+    def get_annotation(self, name, message = None, peer = None):
+        return Tables.Annotation.select_obj(
+            self._conn, self.node_id,
+            name,
+            message and message['message_id'] or None,
+            peer and peer['peer_id'] or None)['value']
+
+
+class PostingNode(SubscriptionNode, AnnotationNode):
     def post_message(self, message):
         message['message_id'] = self.calculate_message_id(message)
         message['message_challenge_id'] = self.calculate_message_challenge_id(message)
@@ -543,43 +570,72 @@ class UINode(ExprNode):
             'subtypelink', type, parent_type,
             self.get_message_by_expr(["system", "subtype"]))
 
-    def get_existing_dir_prefix(self, root, path):
-        #FIXME: Use binary search here to speed things up!
-        existing_path = path
-        node = self.get_message_by_expr(["dir", existing_path, root])
-        while not node and existing_path:
-            existing_path = existing_path[:-1]
-            node = self.get_message_by_expr(["dir", existing_path, root])
-        return node, path[len(existing_path):]
-
-    def post_dirlink_message(self, parent, char, child):
+    def post_nametreelink_message(self, parent, char, child):
         return self.post_usaged_link_message(
             char, parent, child,
-            self.get_message_by_expr(["system", "dirlink"]))
+            self.get_message_by_expr(["system", "nametreelink"]))
 
-    def post_dirnode_message(self):
+    def post_nametreenode_message(self, root, name):
         return self.post_typed_text_message(
-            'dirnode',
-            self.get_message_by_expr(["system", "dirnode"]))
+            'nametreenode:%s:%s' % (isinstance(root, dict) and self.id2s(root['message_id']) or root, name),
+            self.get_message_by_expr(["system", "nametreenode"]))
 
-    def post_dircontentlink_message(self, dirnode, message):
+    def post_nametreeroot_message(self, parent_root):
+        return self.post_nametreenode_message(parent_root, '')
+
+    def post_nametreeleaflink_message(self, nametreenode, message):
         return self.post_usaged_link_message(
-            'dircontentlink', dirnode, message,
-            self.get_message_by_expr(["system", "dircontentlink"]))
+            'nametreeleaflink', nametreenode, message,
+            self.get_message_by_expr(["system", "nametreeleaflink"]))
 
-    def post_dirlevel_message(self, existing, char):
-        node = self.post_dirnode_message()
-        self.post_dirlink_message(existing, char, node),
+    def post_nametreelevel_message(self, root, name, existing, char):
+        node = self.post_nametreenode_message(root, name)
+        self.post_nametreelink_message(existing, char, node),
         return node
 
-    def post_direntry_message(self, root, path, message):
-       existing, rest_path = self.get_existing_dir_prefix(root, path)
-       self.update_local_subscription(existing)
-       for char in rest_path:
-           existing = self.post_dirlevel_message(existing, char)
-       return self.post_dircontentlink_message(existing, message)
+    def get_existing_nametree_prefix(self, root, name):
+        #FIXME: Use binary search here to speed things up!
+        existing_name = name
+        node = self.get_message_by_expr(["nametreelookup", existing_name, root])
+        while not node and existing_name:
+            existing_name = existing_name[:-1]
+            node = self.get_message_by_expr(["nametreelookup", existing_name, root])
+        return node, name[len(existing_name):]
+        
+    def ensure_nametree(self, root, name):
+        existing, rest_name = self.get_existing_nametree_prefix(root, name)
+        self.update_local_subscription(existing)
+        prefix = name[:-len(rest_name)]
+        for char in rest_name:
+            prefix = prefix + char
+            existing = self.post_nametreelevel_message(root, prefix, existing, char)
+        return existing
 
+#     def get_existing_dirpath_prefix(self, root, path):
+#         #FIXME: Use binary search here to speed things up!
+#         existing_path = path
+#         node = self.get_message_by_expr(["cd", existing_path, root])
+#         while not node and existing_path:
+#             existing_path = existing_path[:-1]
+#             node = self.get_message_by_expr(["cd", existing_path, root])
+#         return node, path[len(existing_path):]
+
+#     def post_direntrylink_message(self, root, name, message):
+#         return self.post_nametreeleaflink_message(self.ensure_nametree(root, name), message)
+
+#     def post_direntry_message(self, root, name):
+#         return self.post_direntrylink_message(root, name, self.post_nametreenode_message())
+
+#     def ensure_dirpath(self, root, path):
+#         existing, rest_path = self.get_existing_dirpath_prefix(root, path)
+#         self.update_local_subscription(existing)
+#         for entry in rest_path:
+#             existing = self.post_direntry_message(existing, entry)
+#         return existing
+
+#     def post_pathentry_message(self, root, path, message):
+#         return self.post_nametreeleaflink_message(self.ensure_dirpath(root, path), message)
         
     
-class LocalNode(ThreadSyncNode, IntrospectionNode, UINode):
+class LocalNode(ThreadSyncNode, IntrospectionNode, PostingNode):
     pass

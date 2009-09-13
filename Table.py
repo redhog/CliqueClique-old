@@ -20,6 +20,7 @@ class Table(object):
             self.arg = arg
             self.kw = kw
             self.cols = None
+            self.result = None
 
         def __enter__(self):
             self.cur = self.conn.cursor()
@@ -28,7 +29,7 @@ class Table(object):
             except:
                 self.__exit__(*sys.exc_info())
                 raise
-            return self
+            return self.SelectDictsIterator(self)
 
         def __exit__(self, exc_type, exc_value, traceback):
             self.cur.close()
@@ -38,15 +39,23 @@ class Table(object):
                 else:
                     exc_value.args = exc_value.args + (self.arg, self.kw)
 
-        def __iter__(self):
-            return self
+        class SelectDictsIterator(object):
+            def __init__(self, select_dicts):
+                self.select_dicts = select_dicts
 
-        def next(self):
-            if not hasattr(self, "cur"): raise Exception("This is not an iterator but a context manager. Please use a with-statement, and iterate over the result variable.")
-            row = self.cur.fetchone()
-            if row is None: raise StopIteration
-            if self.cols is None: self.cols = [dsc[0] for dsc in self.cur.description]
-            return dict(zip(self.cols, [self.conn.convert_data_out(data) for data in row]))
+            def __iter__(self):
+                return self
+
+            def next(self):
+                row = self.select_dicts.cur.fetchone()
+                if row is None: raise StopIteration
+                if self.select_dicts.cols is None: self.select_dicts.cols = [dsc[0] for dsc in self.select_dicts.cur.description]
+                return dict(zip(self.select_dicts.cols, [self.select_dicts.conn.convert_data_out(data) for data in row]))
+
+        def __getitem__(self, name):
+            with self as i:
+                self.result = list(i)
+            return self.result[name]
     
     @classmethod
     def _select_dicts(cls, conn, *arg, **kw):
