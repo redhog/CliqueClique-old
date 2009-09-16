@@ -8,6 +8,7 @@ import traceback
 debug_sync = False
 debug_sync_connect = False
 debug_sync_connect_details = False
+debug_message_expr = False
 reconnect_delay = 10.0
 
 class HostedNode(Node.Node):
@@ -270,6 +271,7 @@ class ExprNode(Node.Node):
             return None
 
     def get_messages_by_expr(self, expr):
+        if debug_message_expr: print "get_messages_by_expr(%s)" % (expr,)
         froms, wheres, params = self._message_expr_to_sql(
             expr, "message.message_id", {"alias": 0, "vars": {}})
         return Tables.Message.select_objs(
@@ -458,11 +460,38 @@ class ExprNode(Node.Node):
             ["inv", "nametreelinks", expr[1], expr[2]],
             prev, info)
 
-    def _message_expr_to_sql_nametreelookup(self, expr, prev, info, data):
-        res = expr[2]
-        for char in expr[1]:
-            res = ["nametreelinked", ["content", char], res]
-        return self._message_expr_to_sql(res, prev, info)
+    def _message_expr_to_sql_nametreelookup(self, expr, prev, info, data): 
+        info['alias'] += 1
+        
+        if isinstance(expr[2], dict) or expr[2][0] == 'id':
+            froms = ["message as a%(alias_id)s" % data]
+            wheres = ["""(    a%(alias_id)s.node_id = %(node_id)s
+                          and a%(alias_id)s.content = 'nametreenode:' || %(param)s || ':' || %(param)s
+                          and a%(alias_id)s.message_id = %(prev)s)""" % data]
+            if isinstance(expr[2], dict):
+                root = expr[2]['message_id']
+            else:
+                root = expr[2][1]
+            params = [root, expr[1]]
+        else:
+            raise NotImplementedError("Not yet implemented")
+            info['alias'] += 1
+            data['root_alias_id'] = data['alias_id'] + 1
+
+            froms, wheres, params = self._message_expr_to_sql(
+                expr[2],
+                "a%(root_alias_id)s.message_id" % data,
+                info)
+
+            froms.append("message as a%(root_alias_id)s" % data)
+            froms.append("message as a%(alias_id)s" % data)
+
+            wheres.append("""(    a%(root_alias_id)s.node_id = %(node_id)s
+                              and a%(alias_id)s.node_id = %(node_id)s
+                              and a%(alias_id)s.content = 'nametreenode:' || to_hex(a%(root_alias_id)s.message_id) || ':' || %(param)s
+                              and a%(alias_id)s.message_id = %(prev)s)""" % data)
+            params.append(expr[1])
+        return froms, wheres, params
     
     def _message_expr_to_sql_nametreeleaflink(self, expr, prev, info, data):
         return self._message_expr_to_sql(
@@ -600,7 +629,7 @@ class PostingNode(SubscriptionNode, AnnotationNode):
         while not node and existing_name:
             existing_name = existing_name[:-1]
             node = self.get_message_by_expr(["nametreelookup", existing_name, root])
-        return node, name[len(existing_name):]
+        return node or root, name[len(existing_name):]
         
     def ensure_nametree(self, root, name):
         existing, rest_name = self.get_existing_nametree_prefix(root, name)
