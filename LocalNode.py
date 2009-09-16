@@ -460,7 +460,8 @@ class ExprNode(Node.Node):
             ["inv", "nametreelinks", expr[1], expr[2]],
             prev, info)
 
-    def _message_expr_to_sql_nametreelookup(self, expr, prev, info, data): 
+    def _message_expr_to_sql_nametreelookup(self, expr, prev, info, data):
+        # nametreelookup name root
         info['alias'] += 1
         
         if isinstance(expr[2], dict) or expr[2][0] == 'id':
@@ -472,7 +473,7 @@ class ExprNode(Node.Node):
                 root = expr[2]['message_id']
             else:
                 root = expr[2][1]
-            params = [root, expr[1]]
+            params = [self.id2s(root), expr[1]]
         else:
             raise NotImplementedError("Not yet implemented")
             info['alias'] += 1
@@ -508,11 +509,8 @@ class ExprNode(Node.Node):
             ["inv", "nametreeleaflinks", expr[1], expr[2]],
             prev, info)
     
-    def _message_expr_to_sql_cd(self, expr, prev, info, data):
-        res = expr[2]
-        for entry in expr[1]:
-            res = ['nametreeleaflinked', [], ['nametreelookup', entry, res]]
-        return self._message_expr_to_sql(res, prev, info)
+    def _message_expr_to_sql_nametreelookupentry(self, expr, prev, info, data):
+        return self._message_expr_to_sql(["nametreeleaflinked", [], ["nametreelookup", expr[1], expr[2]]], prev, info)
 
     
 class SubscriptionNode(ExprNode):
@@ -640,31 +638,8 @@ class PostingNode(SubscriptionNode, AnnotationNode):
             existing = self.post_nametreelevel_message(root, prefix, existing, char)
         return existing
 
-#     def get_existing_dirpath_prefix(self, root, path):
-#         #FIXME: Use binary search here to speed things up!
-#         existing_path = path
-#         node = self.get_message_by_expr(["cd", existing_path, root])
-#         while not node and existing_path:
-#             existing_path = existing_path[:-1]
-#             node = self.get_message_by_expr(["cd", existing_path, root])
-#         return node, path[len(existing_path):]
-
-#     def post_direntrylink_message(self, root, name, message):
-#         return self.post_nametreeleaflink_message(self.ensure_nametree(root, name), message)
-
-#     def post_direntry_message(self, root, name):
-#         return self.post_direntrylink_message(root, name, self.post_nametreenode_message())
-
-#     def ensure_dirpath(self, root, path):
-#         existing, rest_path = self.get_existing_dirpath_prefix(root, path)
-#         self.update_local_subscription(existing)
-#         for entry in rest_path:
-#             existing = self.post_direntry_message(existing, entry)
-#         return existing
-
-#     def post_pathentry_message(self, root, path, message):
-#         return self.post_nametreeleaflink_message(self.ensure_dirpath(root, path), message)
-        
+    def post_direntrylink_message(self, root, name, message):
+        return self.post_nametreeleaflink_message(self.ensure_nametree(root, name), message)        
     
 class LocalNode(ThreadSyncNode, IntrospectionNode, PostingNode):
     pass
