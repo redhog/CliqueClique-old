@@ -1,9 +1,7 @@
 from __future__ import with_statement
 
-import datetime, md5, threading, operator, types, socket
+import traceback, operator, socket, symmetricjsonrpc
 import Utils, Tables, Node, Visualizer
-import symmetricjsonrpc
-import traceback
 
 debug_sync = False
 debug_sync_connect = False

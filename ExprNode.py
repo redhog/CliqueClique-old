@@ -1,6 +1,6 @@
 from __future__ import with_statement
 
-import SyncNode, Tables, Node
+import Node, Tables
 
 debug_message_expr = False
 
