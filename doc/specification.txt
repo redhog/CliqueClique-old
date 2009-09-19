@@ -125,3 +125,32 @@ This distance may change over time as the subscription graph changes.
 A subscription keeps track of this value for itself and for its peer,
 to allow propagating changes of the center distance to the
 subscription on the other peer.
+
+
+* Data structures
+
+** Sparse unbounded numeric mappings
+
+The following tree data structure allows a sparse mapping from the
+full set of real numbers to messages. It does not require one to set
+any pre-defined upper/lower limit to the set of numbers that can be
+mapped.
+
+1--2--4--8--16--32--64--128
+|  |  |  |  |   |
+            |   32--48--56--60--62--63-...
+            |   |
+            |   32--40--44--46--47
+            |
+            16--24--28--30--31--31.5--31.75-....
+            |    |   |
+            |    |  28--29--29.5-...
+            |    |
+            |   24--26--27-...
+            |
+            16--20--22--23--23.5-...
+
+On the main right axis, the distance is doubled for every right arc.
+On every other right axis, the distance is halved for each right arc.
+The first distance for a right arc is halved for each left arc. The
+distance for a left arc is allways zero.
