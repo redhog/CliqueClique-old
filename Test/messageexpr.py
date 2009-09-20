@@ -1,5 +1,6 @@
 from __future__ import with_statement
 import Host, md5, Node, Visualizer
+
 def node_num_to_id(node_num):
     return md5.md5("node_%s" % node_num).hexdigest()
 
@@ -35,4 +36,4 @@ for expr in [
     print expr
     with n0.get_messages_by_expr(expr) as x:
         for m in x:
-            print Visualizer.VisualizerOperations._ids2labels(m)
+            print Visualizer.VisualizerOperations._ids2s(m)
