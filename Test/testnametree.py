@@ -5,6 +5,7 @@ def node_num_to_id(node_num):
     return md5.md5("node_%s" % node_num).hexdigest()
 
 h = Host.Host()
+h.initialize()
 n0 = h.get_node(Node.NodeOperations.s2id(node_num_to_id(0)))
 
 for s in ('foobar', 'food', 'kafoo'):

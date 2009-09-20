@@ -1,6 +1,6 @@
 from __future__ import with_statement
 
-import Node, AnnotationNode, SyncNode, ExprNode, SubscriptionNode, PostingNode, IntrospectionNode, Tables
+import InitializationNode
 
-class LocalNode(SyncNode.ThreadSyncNode, IntrospectionNode.IntrospectionNode, PostingNode.PostingNode):
+class LocalNode(InitializationNode.InitializationNode):
     pass

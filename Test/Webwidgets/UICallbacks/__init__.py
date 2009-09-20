@@ -58,7 +58,9 @@ class MainWindow(object):
                         print "=========================================="
 
             def get_node(self, node_id, **kw):
-                return self.parent.host.get_node(self.s2id(node_id), cache=True, **kw)
+                if 'cache' not in kw: kw['cache'] = True
+                if 'typesystem' not in kw: kw['typesystem'] = False
+                return self.parent.host.get_node(self.s2id(node_id), **kw)
 
             def get_node_message(self, message):
                 node_id, message_id = message.split(':')
@@ -67,7 +69,6 @@ class MainWindow(object):
 
             def get_message(self, message):
                 return self.get_node_message(message)[1]
-
 
             def update(self):
                 self.clear()
