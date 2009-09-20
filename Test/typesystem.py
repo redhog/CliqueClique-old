@@ -1,5 +1,5 @@
 from __future__ import with_statement
-import Host, md5, Node, Visualizer, unittest
+import CliqueClique.Host, CliqueClique.Node, md5, unittest
 
 class TestTypesystem(unittest.TestCase):
     @classmethod
@@ -7,8 +7,8 @@ class TestTypesystem(unittest.TestCase):
         return md5.md5("node_%s" % node_num).hexdigest()
 
     def message_expr_test(self, expr, *messages):
-        h = Host.Host()
-        n0 = h.get_node(Node.NodeOperations.s2id(self.node_num_to_id(0)))
+        h = CliqueClique.Host.Host()
+        n0 = h.get_node(CliqueClique.Node.NodeOperations.s2id(self.node_num_to_id(0)))
 
         with n0.get_messages_by_expr(expr) as res:
             found_messages = set(message['content'] for message in res)
