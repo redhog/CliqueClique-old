@@ -27,7 +27,7 @@ class TestDistribution(unittest.TestCase):
     def node_num_to_id(cls, node_num):
         return md5.md5("node_%s" % node_num).hexdigest()
 
-    def test_distribution_syncall(self):
+    def setup_testmsg_set(self):
         h = CliqueClique.Host.Host()
         h.initialize()
         nodes = [h.get_node(CliqueClique.Node.NodeOperations.s2id(self.node_num_to_id(x)),
@@ -41,13 +41,26 @@ class TestDistribution(unittest.TestCase):
         nodes[1].import_message_from_peer(nodes[0], msg1['message_id'])
         nodes[2].import_message_from_peer(nodes[1], msg1['message_id'])
 
-        while nodes[0].sync_peers_locally(nodes[1]): pass
-        
+        return h, nodes
+
+    def test_distribution_noleak(self):
+        h, nodes = self.setup_testmsg_set()
+        while nodes[0].sync_peers_locally(nodes[1]): pass        
         self.assertEqual(nodes[1].get_message_by_expr(["content", "Link"]), None)
-
-        nodes[1].update_local_subscription(msg1, subscribed = 1)
-
-        while nodes[0].sync_peers_locally(nodes[1]): pass
         
+    def test_distribution_onehop(self):
+        h, nodes = self.setup_testmsg_set()
+        nodes[1].update_local_subscription(nodes[1].get_message_by_expr(["content", "Message"]), subscribed = 1)
+        while nodes[0].sync_peers_locally(nodes[1]): pass
         self.assertEqual(nodes[1].get_message_by_expr(["content", "Link"])["content"], "Link")
         self.assertEqual(nodes[1].get_message_by_expr(["content", "Comment"]), None)
+
+    def test_distribution_twohop(self):
+        h, nodes = self.setup_testmsg_set()
+        nodes[2].update_local_subscription(nodes[2].get_message_by_expr(["content", "Message"]), subscribed = 1)
+        synced = 1
+        while synced:
+            synced = nodes[0].sync_peers_locally(nodes[1])
+            synced += nodes[1].sync_peers_locally(nodes[2])
+        self.assertEqual(nodes[2].get_message_by_expr(["content", "Link"])["content"], "Link")
+        self.assertEqual(nodes[2].get_message_by_expr(["content", "Comment"]), None)
