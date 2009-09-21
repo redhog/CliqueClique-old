@@ -25,6 +25,7 @@ import unittest
 
 from typesystem import *
 from nametree import *
+from distribution import *
 
 if __name__ == "__main__":
     unittest.main()
