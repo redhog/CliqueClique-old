@@ -31,7 +31,9 @@ class TestDistribution(unittest.TestCase):
         h = CliqueClique.Host.Host()
         h.initialize()
         nodes = [h.get_node(CliqueClique.Node.NodeOperations.s2id(self.node_num_to_id(x)),
-                            last_seen_address="tcp:localhost:471%s" % x)
+                            last_seen_address="tcp:localhost:471%s" % x,
+                            cache = True,
+                            typesystem = False)
                  for x in xrange(0, 3)]
 
         msg1 = nodes[0].post_text_message('Message')
@@ -64,3 +66,23 @@ class TestDistribution(unittest.TestCase):
             synced += nodes[1].sync_peers_locally(nodes[2])
         self.assertEqual(nodes[2].get_message_by_expr(["content", "Link"])["content"], "Link")
         self.assertEqual(nodes[2].get_message_by_expr(["content", "Comment"]), None)
+
+    def test_distribution_threaded(self):
+        h, nodes = self.setup_testmsg_set()
+        nodes[2].update_local_subscription(nodes[2].get_message_by_expr(["content", "Message"]), subscribed = 1)
+        for node in nodes:
+            node.commit()
+            node.sync_start()
+        timeout = 0
+        while timeout < 120:
+            if nodes[2].get_message_by_expr(["content", "Link"]) is not None:
+                break
+            timeout += 1
+            h.wait_for_change(1.0)
+        self.assertEqual(nodes[2].get_message_by_expr(["content", "Link"])["content"], "Link")
+        self.assertEqual(nodes[2].get_message_by_expr(["content", "Comment"]), None)
+        for node in nodes:
+            node.sync_stop()
+
+        
+        

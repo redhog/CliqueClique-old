@@ -19,9 +19,11 @@ class InitializationNode(SyncNode.ThreadSyncNode, IntrospectionNode.Introspectio
           return res
 
      def _initialize(self, **kw):
+          do_typesystem = kw.pop('typesystem', True)
+          
           Node.Node._initialize(self, **kw)
 
-          if not kw.get('typesystem', True):
+          if not do_typesystem:
               return
 
           self._post_system_message('usage')

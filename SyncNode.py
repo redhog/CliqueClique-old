@@ -3,8 +3,8 @@ from __future__ import with_statement
 import traceback, operator, socket, symmetricjsonrpc
 import Utils, Tables, Node, Visualizer
 
-debug_sync = False
-debug_sync_connect = False
+debug_sync = True
+debug_sync_connect = True
 debug_sync_connect_details = False
 reconnect_delay = 10.0
 
